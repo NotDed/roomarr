@@ -62,6 +62,28 @@ More detail — including what each soft scoring term is worth in m² of floor �
 
 ---
 
+## The search, and the standard answer that didn't work
+
+The plan said simulated annealing. It's what you reach for on a layout problem, and here it is
+measurably the wrong tool — worth writing down, because the reason generalises.
+
+Every pose the search considers is generated already legal, which is what makes the results
+trustworthy. It also means the feasible set is **sparse and disconnected**: from a working
+arrangement, almost every single-item move lands somewhere illegal, so there is often no path
+between two good layouts through good layouts. Annealing is a random walk, and a random walk needs
+a connected space to walk through. Four versions failed in four different ways — a hard feasibility
+gate froze it after 4 evaluations, a soft penalty version reached 28 feasible states out of 2600,
+and seeding it from greedy still finished _below_ the greedy layout it started from.
+
+What replaced it ([`src/core/refine.ts`](./src/core/refine.ts)) is iterated local search: build
+several layouts constructively in different item orders, then repeatedly take each item out and
+try every candidate pose for it, keeping the best. It never needs to pass through an illegal
+state, so the disconnection stops mattering. Same budget, and on the bedroom fixture it scores
+1.3742 against greedy's 1.3472 — which is the point of
+[`bench/`](./bench/search.test.ts) existing.
+
+---
+
 ## What it does
 
 - **Rooms that aren't rectangles.** Rectilinear polygons with 90° corners, so alcoves, L-shapes,
@@ -120,8 +142,9 @@ That boundary is enforced two ways, both of which have to keep passing:
 - [x] **M3** — the walkable-area metric, live while you drag, with a heat overlay
 - [x] **M4** — constraints and violations in plain sentences
 - [x] **M5** — greedy auto-arrange
-- [ ] **M6** — simulated annealing in a worker, plus a fixture bench
-- [ ] **M7** — three labelled options, move budget, per-item locks
+- [x] **M6** — the search in a worker, plus a fixture bench
+- [x] **M7** — three labelled options and a move budget
+- [ ] **M7b** — magnetic snapping, saved arrangements, the compare screen
 - [ ] **M8** — the printable blueprint and the move plan
 - [ ] **M9** — import/export, sample rooms, onboarding
 
