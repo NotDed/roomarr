@@ -32,7 +32,11 @@
     {
       "files": ["**/*.test.ts", "**/*.test.tsx", "bench/**"],
       "rules": {
-        "no-console": "off"
+        "no-console": "off",
+        // Building a variant fixture with `map` + spread is the clearest way to
+        // say "the same room but one wall is wrong". The perf concern does not
+        // apply to six-element arrays, and the hot paths use typed arrays.
+        "oxc/no-map-spread": "off"
       }
     }
   ],

@@ -6,7 +6,7 @@
      React import, this config fails and the main one would not have. */
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES2022"],
+    "lib": ["ES2023"],
     "jsx": "preserve",
     "types": []
   },
