@@ -13,7 +13,7 @@ import {
 import { type Zone, featureZones, sectorContains } from '@/core/openings';
 import { type Room, distanceToNearestWall, rectInsideRoom, roomWalls } from '@/core/room';
 import { type DisplayUnit, type Mm, formatLength } from '@/core/units';
-import { computeWalkable } from '@/core/walkable';
+import { BODY_RADII, type WalkableResult, computeWalkable } from '@/core/walkable';
 import type { WallId } from '@/core/wallrun';
 
 /**
@@ -91,6 +91,16 @@ export interface ConstraintInput {
   roomIsSleeping: boolean;
   /** For the numbers inside messages. Storage stays millimetres regardless. */
   unit?: DisplayUnit;
+  /**
+   * An already-computed walkability result for this same layout.
+   *
+   * Only "is the door reachable" needs it, and the caller usually has one
+   * already — scoring a layout computed it a moment ago. Recomputing was
+   * doubling the cost of every evaluation the search makes, which is the
+   * difference between a search that runs for a second and one that runs for
+   * two.
+   */
+  walkable?: WalkableResult;
 }
 
 /** How close counts as "against the wall". A skirting board is about this. */
@@ -224,14 +234,16 @@ export function checkLayout(input: ConstraintInput): Violation[] {
 
   // ── Is the way in usable at all ────────────────────────────────────────
 
-  const walkable = computeWalkable({
-    room: input.room,
-    items: input.items,
-    layout: input.layout,
-    features: input.features,
-    wallIds: input.wallIds,
-    radius: 350,
-  });
+  const walkable =
+    input.walkable ??
+    computeWalkable({
+      room: input.room,
+      items: input.items,
+      layout: input.layout,
+      features: input.features,
+      wallIds: input.wallIds,
+      radius: BODY_RADII.comfort,
+    });
 
   if (walkable.infeasible?.code === 'door-blocked') {
     out.push({

@@ -12,7 +12,7 @@ import {
 import { largestFreeRect, rectAreaMm2 } from '@/core/metrics';
 import { type Room, distanceToNearestWall, rectInsideRoom, roomArea } from '@/core/room';
 import type { Mm, Mm2 } from '@/core/units';
-import { BODY_RADII, computeWalkable } from '@/core/walkable';
+import { BODY_RADII, type WalkableResult, computeWalkable } from '@/core/walkable';
 import type { WallId } from '@/core/wallrun';
 
 /**
@@ -78,22 +78,34 @@ export interface ScoreInput {
   cell?: Mm;
 }
 
-export interface ScoreBreakdown {
+export interface GeometryScore {
   total: number;
   walkableMm2: Mm2;
   largestRectMm2: Mm2;
   terms: { name: keyof Weights; raw: number; weighted: number }[];
+  /** Kept so the caller can reuse it rather than recomputing. */
+  walkable: WalkableResult;
+}
+
+export interface ScoreBreakdown extends GeometryScore {
   violations: Violation[];
   feasible: boolean;
 }
 
 /**
- * Score a layout.
+ * Score the geometry, without running the full constraint check.
  *
- * Returns the breakdown rather than a bare number, so the UI can say *why* one
- * arrangement beat another instead of asserting that it did.
+ * The search uses this. It can afford to, because candidate poses are already
+ * individually legal by construction — the only rules that can still be broken
+ * are the ones *between* movable items, and those are caught by a cheap overlap
+ * gate before anything is scored at all. The winners get the full check before
+ * they are ever shown to anyone.
+ *
+ * Skipping it matters: the constraint pass is the more expensive half of an
+ * evaluation, and a search that pays it on every one of thousands of layouts
+ * spends most of its budget proving things it already knows.
  */
-export function scoreLayout(input: ScoreInput): ScoreBreakdown {
+export function scoreGeometry(input: ScoreInput): GeometryScore {
   const weights = input.weights ?? DEFAULT_WEIGHTS;
 
   const walkable = computeWalkable({
@@ -106,19 +118,6 @@ export function scoreLayout(input: ScoreInput): ScoreBreakdown {
     ...(input.cell === undefined ? {} : { cell: input.cell }),
   });
 
-  const violations = checkLayout({
-    room: input.room,
-    items: input.items,
-    layout: input.layout,
-    features: input.features,
-    wallIds: input.wallIds,
-    roomIsSleeping: input.roomIsSleeping,
-  });
-  const feasible = !violations.some((v) => v.severity === 'hard');
-
-  /* The most floor that could possibly be walkable: the room minus what the
-     furniture stands on. Normalising against this rather than against the room
-     keeps the term comparable between a sparse room and a crowded one. */
   const footprints = placedItems(input.items, input.layout)
     .filter(({ item }) => !item.overlappable)
     .reduce((sum, { item, placement }) => sum + rectAreaMm2(itemRect(item, placement)), 0);
@@ -127,12 +126,8 @@ export function scoreLayout(input: ScoreInput): ScoreBreakdown {
   const rect = largestFreeRect(walkable.walkable, walkable.grid);
   const largestRectMm2 = rectAreaMm2(rect);
 
-  const terms: ScoreBreakdown['terms'] = [
-    {
-      name: 'walkableArea',
-      raw: clamp01(walkable.walkableMm2 / headroom),
-      weighted: 0,
-    },
+  const terms: GeometryScore['terms'] = [
+    { name: 'walkableArea', raw: clamp01(walkable.walkableMm2 / headroom), weighted: 0 },
     {
       /* Against a quarter of the available floor: asking for one usable space
          rather than for the whole room to be a single rectangle. */
@@ -150,13 +145,34 @@ export function scoreLayout(input: ScoreInput): ScoreBreakdown {
     total += term.weighted;
   }
 
+  return { total, walkableMm2: walkable.walkableMm2, largestRectMm2, terms, walkable };
+}
+
+/**
+ * Score a layout.
+ *
+ * Returns the breakdown rather than a bare number, so the UI can say *why* one
+ * arrangement beat another instead of asserting that it did.
+ */
+export function scoreLayout(input: ScoreInput): ScoreBreakdown {
+  const geometry = scoreGeometry(input);
+
+  /* Reuses the walkability result the geometry pass just produced, rather than
+     making the constraint checker compute the same thing again. */
+  const violations = checkLayout({
+    room: input.room,
+    items: input.items,
+    layout: input.layout,
+    features: input.features,
+    wallIds: input.wallIds,
+    roomIsSleeping: input.roomIsSleeping,
+    walkable: geometry.walkable,
+  });
+
   return {
-    total,
-    walkableMm2: walkable.walkableMm2,
-    largestRectMm2,
-    terms,
+    ...geometry,
     violations,
-    feasible,
+    feasible: !violations.some((v) => v.severity === 'hard'),
   };
 }
 
