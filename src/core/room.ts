@@ -335,6 +335,71 @@ export function roomBounds(room: Room): Rect {
 }
 
 /**
+ * Is an axis-aligned rectangle wholly inside the room?
+ *
+ * Not the same question as "is it inside the bounding box". An L-shaped room's
+ * bounding box includes the bite taken out of it, so a wardrobe placed in that
+ * notch passes a bbox test and is nonetheless standing outside the room.
+ *
+ * Exact for this geometry without any clipping: the rectangle is inside iff its
+ * centre is inside **and** no wall crosses its interior. If a wall crossed it,
+ * part of the rectangle would be on the far side; if none does and the centre
+ * is in, the whole rectangle is in. Both halves are needed — the centre test
+ * alone misses a rectangle straddling a wall, and the crossing test alone
+ * passes a rectangle sitting entirely outside.
+ */
+export function rectInsideRoom(room: Room, rect: Rect): boolean {
+  const centre = { x: rect.x + rect.w / 2, y: rect.y + rect.d / 2 };
+  if (!roomContains(room, centre)) return false;
+
+  const right = rect.x + rect.w;
+  const bottom = rect.y + rect.d;
+
+  for (const wall of deriveWalls(room.outline)) {
+    const loX = Math.min(wall.start.x, wall.end.x);
+    const hiX = Math.max(wall.start.x, wall.end.x);
+    const loY = Math.min(wall.start.y, wall.end.y);
+    const hiY = Math.max(wall.start.y, wall.end.y);
+
+    /* Strict on both sides: a wall lying exactly along an edge is an item
+       flush against it, which is the commonest legal arrangement there is. */
+    if (loX < right && hiX > rect.x && loY < bottom && hiY > rect.y) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Shortest distance from a rectangle's edge to any wall, and which wall.
+ *
+ * Used to answer "is this actually against a wall" for items that must be.
+ */
+export function distanceToNearestWall(room: Room, rect: Rect): { mm: Mm; wall: Wall | null } {
+  let best = Number.POSITIVE_INFINITY;
+  let which: Wall | null = null;
+
+  for (const wall of deriveWalls(room.outline)) {
+    const wallRect: Rect = {
+      x: Math.min(wall.start.x, wall.end.x),
+      y: Math.min(wall.start.y, wall.end.y),
+      w: Math.abs(wall.end.x - wall.start.x),
+      d: Math.abs(wall.end.y - wall.start.y),
+    };
+
+    const dx = Math.max(wallRect.x - (rect.x + rect.w), rect.x - (wallRect.x + wallRect.w), 0);
+    const dy = Math.max(wallRect.y - (rect.y + rect.d), rect.y - (wallRect.y + wallRect.d), 0);
+    const d = Math.hypot(dx, dy);
+
+    if (d < best) {
+      best = d;
+      which = wall;
+    }
+  }
+
+  return { mm: Number.isFinite(best) ? Math.round(best) : Number.POSITIVE_INFINITY, wall: which };
+}
+
+/**
  * Is a point inside the room? Uses a crossing count, with the boundary treated
  * as inside on the min edges and outside on the max edges — the same half-open
  * rule as `rectContainsPoint`, so a point cannot belong to two cells at once.
