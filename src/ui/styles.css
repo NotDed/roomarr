@@ -543,3 +543,61 @@ button {
   justify-self: start;
   font-size: 12px;
 }
+
+/* ── Recess (alcove / bay / chimney breast) ──────────────────────────────── */
+
+.recess {
+  display: grid;
+  gap: 8px;
+  padding: 11px;
+  background: var(--paper-sunken);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.recess__dir {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.recess__diropt {
+  display: grid;
+  gap: 1px;
+  padding: 7px 8px;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+
+.recess__diropt small {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.recess__diropt--on {
+  border-color: var(--walkable);
+  box-shadow: inset 0 0 0 1px var(--walkable);
+}
+
+.recess select {
+  padding: 5px 6px;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+
+.recess__problem {
+  font-size: 12.5px;
+  color: var(--warn);
+}
+
+.recess__actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}

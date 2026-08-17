@@ -199,6 +199,86 @@ export function closeRun(run: WallRun): ClosureResult {
   return { ok: true, run: { ...run, segments }, fixes };
 }
 
+// ── Alcoves, bays and notches ─────────────────────────────────────────────
+
+/**
+ * Which way the recess goes, seen from inside the room.
+ *
+ * `out` pushes the wall away and gains floor — an alcove, a bay window, the
+ * space beside a chimney breast. `in` eats into the room — a boxed-in soil
+ * pipe, a chimney breast itself, a bulkhead.
+ */
+export type RecessDirection = 'out' | 'in';
+
+export type RecessResult =
+  | { ok: true; run: WallRun }
+  | {
+      ok: false;
+      reason: 'no-such-wall' | 'not-positive' | 'too-wide' | 'needs-margin';
+      /** How much wall is available on the chosen segment. */
+      wallLength?: Mm;
+    };
+
+/**
+ * Cut a rectangular recess into one wall of a run.
+ *
+ * Walking a run clockwise puts the room's interior **on your right** — facing
+ * east along the top wall, the room is to the south. So pushing a wall outward
+ * means turning left, and biting into the room means turning right. Everything
+ * else follows from that one fact.
+ *
+ * The four inserted turns are `left, right, right, left` (or the mirror), which
+ * sum to zero: a recess never changes how many net turns the run has, so a run
+ * that closed before still closes after.
+ *
+ * This is what makes alcoves, L-shapes and bay windows a template rather than a
+ * geometry exercise. A stepped bay is just this applied twice.
+ */
+export function insertRecess(
+  run: WallRun,
+  segmentIndex: number,
+  options: { offset: Mm; width: Mm; depth: Mm; direction: RecessDirection },
+): RecessResult {
+  const target = run.segments[segmentIndex];
+  if (target === undefined) return { ok: false, reason: 'no-such-wall' };
+
+  const { offset, width, depth, direction } = options;
+  if (width <= 0 || depth <= 0 || offset < 0) return { ok: false, reason: 'not-positive' };
+  if (offset + width > target.length) {
+    return { ok: false, reason: 'too-wide', wallLength: target.length };
+  }
+
+  /* A recess flush against a corner would produce a zero-length wall, which is
+     not a room the rest of the codebase can reason about. Rather than silently
+     nudging it a millimetre, say so — the user can move it, or edit the run
+     directly if the recess really does start at the corner. */
+  const after = target.length - offset - width;
+  if (offset === 0 || after === 0) return { ok: false, reason: 'needs-margin' };
+
+  const away: Turn = direction === 'out' ? 'left' : 'right';
+  const back: Turn = direction === 'out' ? 'right' : 'left';
+
+  const inserted: RunSegment[] = [
+    { length: offset, turn: away },
+    { length: depth, turn: back },
+    { length: width, turn: back },
+    { length: depth, turn: away },
+    { length: after, turn: target.turn },
+  ];
+
+  return {
+    ok: true,
+    run: {
+      ...run,
+      segments: [
+        ...run.segments.slice(0, segmentIndex),
+        ...inserted,
+        ...run.segments.slice(segmentIndex + 1),
+      ],
+    },
+  };
+}
+
 // ── Conversion ────────────────────────────────────────────────────────────
 
 export type RunToOutlineResult =

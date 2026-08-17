@@ -3,6 +3,7 @@ import { roomArea } from '@/core/room';
 import { type DisplayUnit, formatAreaM2, formatLength, parseLength } from '@/core/units';
 import { type Turn, residualMagnitude, runCloses, traceRun } from '@/core/wallrun';
 import { useStore } from '@/state/store';
+import { RecessForm } from '@/ui/RecessForm';
 
 const flip = (turn: Turn): Turn => (turn === 'right' ? 'left' : 'right');
 
@@ -92,6 +93,8 @@ export function RoomForm() {
       >
         + Add a wall
       </button>
+
+      <RecessForm />
 
       {/* The whole reason for entering a room this way. A wall run is
           over-determined, so a transposed digit shows up here the moment it is

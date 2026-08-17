@@ -6,6 +6,7 @@ import {
   type RunSegment,
   type WallRun,
   closeRun,
+  insertRecess,
   outlineToRun,
   residualMagnitude,
   runCloses,
@@ -216,6 +217,160 @@ describe('closeRun', () => {
       expect(fix.from).not.toBe(fix.to);
       expect(result.run.segments[fix.segmentIndex]?.length).toBe(fix.to);
     }
+  });
+});
+
+describe('insertRecess', () => {
+  /* Walking clockwise puts the interior on your right, so pushing a wall away
+     means turning left. If that is inverted, every alcove eats the room
+     instead of extending it — and the run still closes, so nothing catches it
+     but this test. */
+  it('pushes a wall outward and gains exactly the alcove area', () => {
+    const result = insertRecess(RECT_RUN, 1, {
+      offset: 1500,
+      width: 1200,
+      depth: 800,
+      direction: 'out',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const outline = runToOutline(result.run);
+    expect(outline.ok).toBe(true);
+    if (!outline.ok) return;
+
+    expect(validateOutline(outline.outline)).toEqual([]);
+    expect(polygonArea(outline.outline)).toBe(3400 * 4200 + 1200 * 800);
+    expect(outline.outline.length).toBe(8);
+  });
+
+  it('bites into the room and loses exactly the notch area', () => {
+    const result = insertRecess(RECT_RUN, 1, {
+      offset: 1500,
+      width: 1200,
+      depth: 800,
+      direction: 'in',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const outline = runToOutline(result.run);
+    expect(outline.ok).toBe(true);
+    if (!outline.ok) return;
+
+    expect(validateOutline(outline.outline)).toEqual([]);
+    expect(polygonArea(outline.outline)).toBe(3400 * 4200 - 1200 * 800);
+  });
+
+  /* The four inserted turns sum to zero, so a run that closed before still
+     closes after — no matter which wall, which direction, or how many times. */
+  it('never breaks closure', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 3 }),
+        fc.integer({ min: 100, max: 1500 }),
+        fc.integer({ min: 100, max: 900 }),
+        fc.integer({ min: 100, max: 900 }),
+        fc.constantFrom<'in' | 'out'>('in', 'out'),
+        (segmentIndex, offset, width, depth, direction) => {
+          const result = insertRecess(RECT_RUN, segmentIndex, {
+            offset,
+            width,
+            depth,
+            direction,
+          });
+          if (result.ok) expect(runCloses(traceRun(result.run))).toBe(true);
+        },
+      ),
+    );
+  });
+
+  it('stacks, so a stepped bay is the same template applied twice', () => {
+    const first = insertRecess(RECT_RUN, 1, {
+      offset: 1200,
+      width: 1800,
+      depth: 300,
+      direction: 'out',
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    /* Segment 3 is the outer face of the first step. */
+    const second = insertRecess(first.run, 3, {
+      offset: 400,
+      width: 1000,
+      depth: 300,
+      direction: 'out',
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+
+    const outline = runToOutline(second.run);
+    expect(outline.ok).toBe(true);
+    if (!outline.ok) return;
+    expect(validateOutline(outline.outline)).toEqual([]);
+    expect(polygonArea(outline.outline)).toBe(3400 * 4200 + 1800 * 300 + 1000 * 300);
+  });
+
+  it('refuses a recess wider than the wall, and says how much wall there is', () => {
+    const result = insertRecess(RECT_RUN, 0, {
+      offset: 3000,
+      width: 1000,
+      depth: 400,
+      direction: 'out',
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('too-wide');
+    expect(result.wallLength).toBe(3400);
+  });
+
+  /* Flush to a corner would emit a zero-length wall, which is not a room the
+     rest of the codebase can reason about. Saying so beats nudging it a
+     millimetre behind the user's back. */
+  it('refuses a recess flush against either corner', () => {
+    for (const offset of [0, 2400]) {
+      const result = insertRecess(RECT_RUN, 0, {
+        offset,
+        width: 1000,
+        depth: 400,
+        direction: 'out',
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.reason).toBe('needs-margin');
+    }
+  });
+
+  it('refuses nonsense dimensions', () => {
+    for (const bad of [
+      { offset: 100, width: 0, depth: 400 },
+      { offset: 100, width: 500, depth: 0 },
+      { offset: -50, width: 500, depth: 400 },
+    ]) {
+      const result = insertRecess(RECT_RUN, 0, { ...bad, direction: 'out' });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.reason).toBe('not-positive');
+    }
+  });
+
+  it('refuses an unknown wall', () => {
+    const result = insertRecess(RECT_RUN, 99, {
+      offset: 100,
+      width: 500,
+      depth: 400,
+      direction: 'out',
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('no-such-wall');
+  });
+
+  it('does not mutate the run it was given', () => {
+    const before = JSON.stringify(RECT_RUN);
+    insertRecess(RECT_RUN, 1, { offset: 1500, width: 1200, depth: 800, direction: 'out' });
+    expect(JSON.stringify(RECT_RUN)).toBe(before);
   });
 });
 
