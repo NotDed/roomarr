@@ -37,7 +37,9 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "immer": "^11.1.17",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zustand": "^5.0.15"
   }
 }
