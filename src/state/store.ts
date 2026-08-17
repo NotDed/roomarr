@@ -12,6 +12,7 @@ import {
 import { doorLandingZone } from '@/core/openings';
 import { itemFromPreset } from '@/core/catalog';
 import { type Violation, checkLayout } from '@/core/constraints';
+import { autoArrange } from '@/core/greedy';
 import {
   type Pose,
   type Rect,
@@ -76,6 +77,17 @@ import {
  * corruption that draws perfectly and is only caught by measuring the printed
  * plan.
  */
+
+/** A proposed arrangement, with everything needed to decide about it. */
+export interface Suggestion {
+  layout: Layout;
+  beforeMm2: number;
+  afterMm2: number;
+  beforeProblems: number;
+  afterProblems: number;
+  moved: string[];
+  keptOriginal: boolean;
+}
 
 export interface RoomarrState {
   schemaVersion: number;
@@ -143,6 +155,17 @@ export interface RoomarrState {
    * The drag keeps mutating one transform imperatively; only the number moves.
    */
   preview: { itemId: string; pose: Pose } | null;
+
+  /**
+   * The last arrangement the search produced, held rather than applied.
+   *
+   * Suggestions are offered, not imposed: you can look at one, keep it, or
+   * throw it away, and the layout you actually have is untouched until you
+   * say so. Held rather than auto-saved so the list of arrangements does not
+   * fill with near-identical runs you then prune by hand.
+   */
+  suggestion: Suggestion | null;
+  arranging: boolean;
   /**
    * Counter behind wall ids. Persisted so ids stay unique across reloads — a
    * counter that restarted at zero would hand a fresh wall the id of one that
@@ -183,6 +206,10 @@ export interface RoomarrState {
   toggleHeat: () => void;
   setPreview: (preview: { itemId: string; pose: Pose } | null) => void;
   dismissProblem: (key: string) => void;
+
+  runAutoArrange: () => void;
+  keepSuggestion: () => void;
+  discardSuggestion: () => void;
 
   reset: () => void;
 }
@@ -231,6 +258,8 @@ export const useStore = create<RoomarrState>()(
       showHeat: true,
       preview: null,
       dismissedProblems: [],
+      suggestion: null,
+      arranging: false,
 
       setUnit: (unit) => set({ unit }),
 
@@ -467,6 +496,55 @@ export const useStore = create<RoomarrState>()(
       setBodyRadius: (bodyRadius) => set({ bodyRadius }),
       toggleHeat: () => set((state) => ({ showHeat: !state.showHeat })),
       setPreview: (preview) => set({ preview }),
+
+      /**
+       * Search for a better arrangement.
+       *
+       * Synchronous: the greedy pass takes about half a second on a furnished
+       * bedroom, which is inside the window where a button press still feels
+       * like a button press. When the annealing search lands it will need a
+       * worker; this does not.
+       */
+      runAutoArrange: () => {
+        const state = get();
+        if (state.room === null || state.run === null || state.items.length === 0) return;
+
+        const result = autoArrange({
+          room: state.room,
+          items: state.items,
+          layout: selectActiveLayout(state),
+          features: state.features,
+          wallIds: runWallIds(state.run),
+          roomIsSleeping: state.roomType === 'bedroom',
+          seed: state.nextItemId * 7 + state.items.length,
+        });
+
+        set({
+          suggestion: {
+            layout: result.layout,
+            beforeMm2: result.baseline.walkableMm2,
+            afterMm2: result.score.walkableMm2,
+            beforeProblems: result.baseline.violations.filter((v) => v.severity === 'hard').length,
+            afterProblems: result.score.violations.filter((v) => v.severity === 'hard').length,
+            moved: result.moved,
+            keptOriginal: result.keptOriginal,
+          },
+        });
+      },
+
+      keepSuggestion: () => {
+        const { suggestion, activeLayoutId } = get();
+        if (suggestion === null) return;
+
+        set((state) => ({
+          layouts: state.layouts.map((l) =>
+            l.id === activeLayoutId ? { ...l, placements: suggestion.layout.placements } : l,
+          ),
+          suggestion: null,
+        }));
+      },
+
+      discardSuggestion: () => set({ suggestion: null }),
 
       dismissProblem: (key) =>
         set((state) =>

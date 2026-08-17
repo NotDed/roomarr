@@ -10,6 +10,7 @@ import { type WallNaming, nameWalls } from '@/core/wallnames';
 import type { WallId } from '@/core/wallrun';
 import { Features } from '@/render/Features';
 import { Items } from '@/render/Items';
+import { Ghosts } from '@/render/Ghosts';
 import { HeatOverlay } from '@/render/HeatOverlay';
 import { useItemDrag } from '@/render/useItemDrag';
 import {
@@ -57,6 +58,8 @@ export interface RoomPlanProps {
   snap?: number;
   /** Walkable-area result to paint underneath the plan. */
   heat?: WalkableResult | null | undefined;
+  /** A proposed arrangement, drawn as ghosts over the current one. */
+  ghostOf?: readonly Placement[] | null | undefined;
   onBackgroundClick?: (() => void) | undefined;
 
   mode?: PlanMode;
@@ -84,6 +87,7 @@ export function RoomPlan({
   onItemPreview,
   snap = 10,
   heat,
+  ghostOf,
   onBackgroundClick,
   mode = 'screen',
 }: RoomPlanProps) {
@@ -164,6 +168,13 @@ export function RoomPlan({
             onPointerDown={onItemMove === undefined ? undefined : drag.onPointerDown}
           />
         )}
+
+        {ghostOf !== null &&
+          ghostOf !== undefined &&
+          items !== undefined &&
+          placements !== undefined && (
+            <Ghosts items={items} from={placements} to={ghostOf} projector={projector} />
+          )}
 
         {features !== undefined && features.length > 0 && (
           <Features

@@ -1027,3 +1027,62 @@ button {
   font-size: 12.5px;
   color: var(--walkable);
 }
+
+/* ── Rearrange ───────────────────────────────────────────────────────────── */
+
+.panel--arrange {
+  background: var(--paper-sunken);
+}
+
+.arrange__go {
+  width: 100%;
+}
+
+.arrange__delta {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.arrange__num {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 650;
+  color: var(--ink-muted);
+  letter-spacing: -0.01em;
+}
+
+.arrange__num--up {
+  color: var(--walkable);
+}
+
+.arrange__from {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.arrange__facts {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  list-style: none;
+}
+
+.arrange__fixed {
+  color: var(--walkable);
+}
+
+.arrange__left {
+  color: var(--warn);
+}
+
+/* The result nobody expects a tool to give, and the one that makes the rest
+   believable. */
+.arrange__same {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--walkable);
+}

@@ -67,6 +67,15 @@ export interface Violation {
   featureIds: string[];
   requiredMm?: Mm;
   actualMm?: Mm;
+  /**
+   * Which clearance rule this is about, when it is about one.
+   *
+   * Needed for identity: an item can breach two of its own clearances at once
+   * (a bed short of room on its side *and* at its foot), and without this the
+   * two are indistinguishable — they collide as list keys, and dismissing one
+   * would silently dismiss the other.
+   */
+  ruleId?: string;
   /** Where to point on the plan. Null when the problem is not about a place. */
   region: Rect | null;
   /** Already a sentence, with the numbers in it. */
@@ -270,6 +279,7 @@ export function checkLayout(input: ConstraintInput): Violation[] {
         featureIds: [],
         requiredMm: r.rule.depth,
         actualMm: r.available,
+        ruleId: r.rule.id,
         region: r.region,
         message: `${item.name} has ${say(r.available)} ${sideWord(r.rule.side)} and needs ${say(
           r.rule.depth,
@@ -277,7 +287,7 @@ export function checkLayout(input: ConstraintInput): Violation[] {
       });
     }
 
-    for (const [group, members] of groups) {
+    for (const members of groups.values()) {
       const best = members.reduce((a, b) => (a.available >= b.available ? a : b));
       if (best.available >= best.rule.depth) {
         pushIfTight(out, item, best.rule, best.available, best.region, say);
@@ -291,11 +301,11 @@ export function checkLayout(input: ConstraintInput): Violation[] {
         featureIds: [],
         requiredMm: best.rule.depth,
         actualMm: best.available,
+        ruleId: best.rule.anyOfGroup ?? best.rule.id,
         region: best.region,
         message: `${item.name} needs ${say(best.rule.depth)} on at least one side — the best it has is ${say(
           best.available,
         )}. ${best.rule.reason}`,
-        ...(group === '' ? {} : {}),
       });
     }
   }
@@ -435,6 +445,7 @@ function pushIfTight(
     featureIds: [],
     requiredMm: preferred,
     actualMm: available,
+    ruleId: rule.id,
     region,
     message: `${item.name} has ${say(available)} ${sideWord(rule.side)}. It works, but ${say(
       preferred,

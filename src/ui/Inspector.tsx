@@ -1,3 +1,4 @@
+import { ArrangePanel } from '@/ui/ArrangePanel';
 import { FeaturePanel } from '@/ui/FeaturePanel';
 import { ItemPanel } from '@/ui/ItemPanel';
 import { MetricPanel } from '@/ui/MetricPanel';
@@ -17,6 +18,10 @@ export function Inspector() {
     <aside className="inspector" aria-label="Inspector">
       <section className="panel panel--metric">
         <MetricPanel />
+      </section>
+
+      <section className="panel panel--arrange">
+        <ArrangePanel />
       </section>
 
       <section className="panel">

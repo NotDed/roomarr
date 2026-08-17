@@ -39,6 +39,7 @@ export function PlanStage() {
   const selectItem = useStore((s) => s.selectItem);
   const moveItem = useStore((s) => s.moveItem);
   const setPreview = useStore((s) => s.setPreview);
+  const suggestion = useStore((s) => s.suggestion);
 
   const bodyRadius = useStore((s) => s.bodyRadius);
   const showHeat = useStore((s) => s.showHeat);
@@ -91,6 +92,7 @@ export function PlanStage() {
           onItemMove={moveItem}
           onItemPreview={(itemId, pose) => setPreview({ itemId, pose })}
           heat={showHeat ? metric : null}
+          ghostOf={suggestion?.keptOriginal === false ? suggestion.layout.placements : null}
           onBackgroundClick={() => {
             selectItem(null);
             selectFeature(null);

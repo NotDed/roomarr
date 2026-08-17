@@ -275,3 +275,27 @@
 .plan--print .plan__scaletext {
   fill: #222;
 }
+
+/* ── Suggested arrangement ───────────────────────────────────────────────── */
+
+/* Drawn over the current layout rather than replacing it. A before/after you
+   have to flick between is read by memory, and memory is bad at "did that get
+   better or just different". */
+.ghost__body {
+  fill: var(--walkable);
+  fill-opacity: 0.12;
+  stroke: var(--walkable);
+  stroke-width: 1.75;
+  stroke-dasharray: 6 4;
+}
+
+.ghost__arrow {
+  stroke: var(--walkable);
+  stroke-width: 1.5;
+  stroke-opacity: 0.8;
+}
+
+.ghost__arrowhead {
+  fill: var(--walkable);
+  fill-opacity: 0.8;
+}

@@ -400,6 +400,37 @@ describe('soft problems', () => {
   });
 });
 
+// ── Identity ──────────────────────────────────────────────────────────────
+
+describe('violation identity', () => {
+  /* An item can breach two of its own clearances at once — a bed short of room
+     on its side AND at its foot. Without the rule id those two are
+     indistinguishable: they collide as list keys, and dismissing one would
+     silently dismiss the other. */
+  it('distinguishes two problems about the same item', () => {
+    const room = makeRectangularRoom(2000, 2600);
+    const bed = itemFromPreset('bed', 'bed');
+    const found = check([bed], [at('bed', 300, 300)], [door({ wallId: 'w2', offset: 600 })], room);
+
+    const keys = found.map((v) =>
+      [v.code, v.ruleId ?? '', ...v.itemIds, ...v.featureIds].join('|'),
+    );
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('names the rule on every clearance problem', () => {
+    const wardrobe = itemFromPreset('wd', 'wardrobe');
+    const blocker = box('blocker', 2000, 2000, 1000);
+    const found = check([wardrobe, blocker], [at('wd', 0, 0), at('blocker', 0, 600)]);
+
+    for (const v of found) {
+      if (v.code === 'clearance' || v.code === 'clearance-tight' || v.code === 'access-group') {
+        expect(v.ruleId).toBeDefined();
+      }
+    }
+  });
+});
+
 // ── An arrangement with nothing wrong with it ─────────────────────────────
 
 describe('a good layout', () => {

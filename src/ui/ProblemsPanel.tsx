@@ -126,5 +126,10 @@ function ProblemRow({
  * the list is recomputed from scratch on every edit and positions shift.
  */
 export function keyOf(violation: Violation): string {
-  return [violation.code, ...violation.itemIds, ...violation.featureIds].join('|');
+  return [
+    violation.code,
+    violation.ruleId ?? '',
+    ...violation.itemIds,
+    ...violation.featureIds,
+  ].join('|');
 }
