@@ -41,6 +41,90 @@
   fill: var(--warn);
 }
 
+/* ── Items ───────────────────────────────────────────────────────────────── */
+
+.item {
+  cursor: grab;
+}
+
+.item:active {
+  cursor: grabbing;
+}
+
+.item__body {
+  fill: var(--paper-sunken);
+  stroke: var(--ink-muted);
+  stroke-width: 1.25;
+}
+
+.item--on .item__body {
+  fill: color-mix(in srgb, var(--focus) 14%, var(--paper-sunken));
+  stroke: var(--focus);
+  stroke-width: 2;
+}
+
+/* A rug is floor, not an obstacle, and it should not read as a solid object
+   competing with the furniture for attention. */
+.item--soft .item__body {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-dasharray: 4 3;
+}
+
+.item--locked .item__body {
+  stroke-dasharray: none;
+  stroke-width: 2;
+}
+
+.item__front {
+  stroke: var(--ink-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.item__name {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 550;
+  fill: var(--ink);
+  pointer-events: none;
+}
+
+.item__dims {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--ink-faint);
+  pointer-events: none;
+}
+
+.item__lock {
+  font-size: 10px;
+  fill: var(--ink-muted);
+  pointer-events: none;
+}
+
+/* Clearance zones. Deliberately faint: they are constraints on where FURNITURE
+   may go, never on where a person may walk, and drawing them as solid blocks
+   would suggest the opposite. */
+.zone {
+  fill: var(--walkable);
+  fill-opacity: 0.1;
+  stroke: var(--walkable);
+  stroke-width: 0.75;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+
+.zone--operate {
+  fill: var(--warn);
+  fill-opacity: 0.1;
+  stroke: var(--warn);
+}
+
+.zone--activity {
+  stroke-dasharray: 1 3;
+}
+
 /* ── Features ────────────────────────────────────────────────────────────── */
 
 .feat__item {

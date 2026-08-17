@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RoomPlan } from '@/render/RoomPlan';
 import { RunPreview } from '@/render/RunPreview';
 import { runWallIds } from '@/core/wallrun';
-import { selectDoorWallIndex, useStore, wallLabelsByIndex } from '@/state/store';
+import {
+  selectActiveLayout,
+  selectDoorWallIndex,
+  useStore,
+  wallLabelsByIndex,
+} from '@/state/store';
 import { EmptyState } from '@/ui/EmptyState';
 
 /**
@@ -26,6 +31,12 @@ export function PlanStage() {
   const selectedFeatureId = useStore((s) => s.selectedFeatureId);
   const selectFeature = useStore((s) => s.selectFeature);
   const doorWallIndex = useStore(selectDoorWallIndex);
+
+  const items = useStore((s) => s.items);
+  const layout = useStore(selectActiveLayout);
+  const selectedItemId = useStore((s) => s.selectedItemId);
+  const selectItem = useStore((s) => s.selectItem);
+  const moveItem = useStore((s) => s.moveItem);
 
   const wallLabels = useMemo(() => wallLabelsByIndex(run, labelsById), [run, labelsById]);
   const wallIds = useMemo(() => (run === null ? [] : runWallIds(run)), [run]);
@@ -61,6 +72,15 @@ export function PlanStage() {
           wallIds={wallIds}
           selectedFeatureId={selectedFeatureId}
           onSelectFeature={selectFeature}
+          items={items}
+          placements={layout.placements}
+          selectedItemId={selectedItemId}
+          onSelectItem={selectItem}
+          onItemMove={moveItem}
+          onBackgroundClick={() => {
+            selectItem(null);
+            selectFeature(null);
+          }}
         />
       ) : run !== null ? (
         <RunPreview run={run} width={box.width} height={box.height} unit={unit} />

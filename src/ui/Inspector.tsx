@@ -1,4 +1,5 @@
 import { FeaturePanel } from '@/ui/FeaturePanel';
+import { ItemPanel } from '@/ui/ItemPanel';
 import { RoomForm } from '@/ui/RoomForm';
 
 /**
@@ -15,6 +16,10 @@ export function Inspector() {
 
       <section className="panel">
         <FeaturePanel />
+      </section>
+
+      <section className="panel">
+        <ItemPanel />
       </section>
 
       <section className="panel">

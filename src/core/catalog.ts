@@ -398,7 +398,7 @@ export function itemFromPreset(
 
   return {
     id,
-    name: preset.variants.length > 1 ? `${preset.label} (${variant.label})` : preset.label,
+    name: preset.variants.length > 1 ? `${preset.label} ${variant.label}` : preset.label,
     type,
     footprint: { ...variant.footprint },
     height: variant.height,

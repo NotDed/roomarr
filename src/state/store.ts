@@ -7,8 +7,18 @@ import {
   primaryDoorWallIndex,
   wallsById,
 } from '@/core/features';
-import { type Room, type Wall, makeRectangularRoom, roomWalls, validateOutline } from '@/core/room';
-import type { DisplayUnit } from '@/core/units';
+import { itemFromPreset } from '@/core/catalog';
+import { type Pose, rotateAbout, translatePose } from '@/core/geometry';
+import type { ClearanceRule, Item, ItemType, Layout, Placement } from '@/core/items';
+import {
+  type Room,
+  type Wall,
+  makeRectangularRoom,
+  roomBounds,
+  roomWalls,
+  validateOutline,
+} from '@/core/room';
+import type { DisplayUnit, Mm } from '@/core/units';
 import { SCHEMA_VERSION } from '@/core/version';
 import {
   type RecessDirection,
@@ -61,6 +71,21 @@ export interface RoomarrState {
   roomType: 'bedroom' | 'living' | 'other';
   selectedFeatureId: string | null;
   nextFeatureId: number;
+
+  /**
+   * The furniture, and where it sits.
+   *
+   * Items and placements are separate on purpose: before and after become two
+   * layouts over one `items` array, so a move diff is a join on `itemId` and
+   * the dimensions can never disagree between them.
+   */
+  items: Item[];
+  layouts: Layout[];
+  /** "As it is now" — what every later suggestion is measured against. */
+  baselineLayoutId: string;
+  activeLayoutId: string;
+  selectedItemId: string | null;
+  nextItemId: number;
   /**
    * Counter behind wall ids. Persisted so ids stay unique across reloads — a
    * counter that restarted at zero would hand a fresh wall the id of one that
@@ -86,6 +111,16 @@ export interface RoomarrState {
   removeFeature: (id: string) => void;
   selectFeature: (id: string | null) => void;
   makePrimaryDoor: (id: string) => void;
+
+  addItem: (type: ItemType, variantIndex?: number) => void;
+  updateItem: (id: string, patch: Partial<Item>) => void;
+  updateClearance: (itemId: string, ruleId: string, patch: Partial<ClearanceRule>) => void;
+  removeItem: (id: string) => void;
+  selectItem: (id: string | null) => void;
+  moveItem: (id: string, pose: Pose) => void;
+  nudgeItem: (id: string, dx: Mm, dy: Mm) => void;
+  rotateItem: (id: string, quarterTurns: number) => void;
+  toggleItemLock: (id: string) => void;
 
   reset: () => void;
 }
@@ -124,6 +159,12 @@ export const useStore = create<RoomarrState>()(
       roomType: 'bedroom',
       selectedFeatureId: null,
       nextFeatureId: 0,
+      items: [],
+      layouts: [{ id: 'now', name: 'As it is now', kind: 'baseline', placements: [] }],
+      baselineLayoutId: 'now',
+      activeLayoutId: 'now',
+      selectedItemId: null,
+      nextItemId: 0,
 
       setUnit: (unit) => set({ unit }),
 
@@ -265,6 +306,101 @@ export const useStore = create<RoomarrState>()(
           ),
         })),
 
+      addItem: (type, variantIndex = 0) => {
+        const { nextItemId, items, room } = get();
+        const id = `i${nextItemId}`;
+        const item = itemFromPreset(id, type, variantIndex);
+
+        /* Drop it just inside the room, stepped so successive items do not
+           land exactly on top of each other. Placement is the user's job; this
+           only has to be somewhere they can see and grab. */
+        const bounds = room === null ? { x: 0, y: 0 } : roomBounds(room);
+        const step = (items.length % 6) * 120;
+        const pose: Pose = { x: bounds.x + 100 + step, y: bounds.y + 100 + step, rot: 0 };
+
+        set((state) => ({
+          items: [...state.items, item],
+          nextItemId: nextItemId + 1,
+          selectedItemId: id,
+          layouts: state.layouts.map((l) =>
+            l.id === state.activeLayoutId
+              ? { ...l, placements: [...l.placements, { itemId: id, pose, locked: false }] }
+              : l,
+          ),
+        }));
+      },
+
+      updateItem: (id, patch) =>
+        set((state) => ({
+          items: state.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+        })),
+
+      /* Clearances are edited per item instance, not per type: "my wardrobe has
+         sliding doors" is a fact about that wardrobe, not about wardrobes. */
+      updateClearance: (itemId, ruleId, patch) =>
+        set((state) => ({
+          items: state.items.map((i) =>
+            i.id === itemId
+              ? {
+                  ...i,
+                  clearances: i.clearances.map((c) => (c.id === ruleId ? { ...c, ...patch } : c)),
+                }
+              : i,
+          ),
+        })),
+
+      removeItem: (id) =>
+        set((state) => ({
+          items: state.items.filter((i) => i.id !== id),
+          layouts: state.layouts.map((l) => ({
+            ...l,
+            placements: l.placements.filter((p) => p.itemId !== id),
+          })),
+          selectedItemId: state.selectedItemId === id ? null : state.selectedItemId,
+        })),
+
+      selectItem: (selectedItemId) => set({ selectedItemId }),
+
+      moveItem: (id, pose) =>
+        set((state) => ({
+          layouts: state.layouts.map((l) =>
+            l.id === state.activeLayoutId
+              ? {
+                  ...l,
+                  placements: l.placements.map((p) => (p.itemId === id ? { ...p, pose } : p)),
+                }
+              : l,
+          ),
+        })),
+
+      nudgeItem: (id, dx, dy) => {
+        const placement = selectActivePlacement(get(), id);
+        if (placement === undefined) return;
+        get().moveItem(id, translatePose(placement.pose, dx, dy));
+      },
+
+      rotateItem: (id, quarterTurns) => {
+        const state = get();
+        const placement = selectActivePlacement(state, id);
+        const item = state.items.find((i) => i.id === id);
+        if (placement === undefined || item === undefined) return;
+        get().moveItem(id, rotateAbout(placement.pose, item.footprint, quarterTurns));
+      },
+
+      toggleItemLock: (id) =>
+        set((state) => ({
+          layouts: state.layouts.map((l) =>
+            l.id === state.activeLayoutId
+              ? {
+                  ...l,
+                  placements: l.placements.map((p) =>
+                    p.itemId === id ? { ...p, locked: !p.locked } : p,
+                  ),
+                }
+              : l,
+          ),
+        })),
+
       reset: () =>
         set({
           run: null,
@@ -272,6 +408,9 @@ export const useStore = create<RoomarrState>()(
           wallLabels: {},
           features: [],
           selectedFeatureId: null,
+          items: [],
+          layouts: [{ id: 'now', name: 'As it is now', kind: 'baseline', placements: [] }],
+          selectedItemId: null,
         }),
     }),
     {
@@ -322,6 +461,11 @@ export const useStore = create<RoomarrState>()(
         features: state.features,
         roomType: state.roomType,
         nextFeatureId: state.nextFeatureId,
+        items: state.items,
+        layouts: state.layouts,
+        baselineLayoutId: state.baselineLayoutId,
+        activeLayoutId: state.activeLayoutId,
+        nextItemId: state.nextItemId,
       }),
     },
   ),
@@ -359,6 +503,18 @@ export function selectDoorWallIndex(state: RoomarrState): number | undefined {
 /** True when the room is a sleeping room, which is what turns on egress rules. */
 export function isSleepingRoom(state: RoomarrState): boolean {
   return state.roomType === 'bedroom';
+}
+
+/** The layout currently being edited. */
+export function selectActiveLayout(state: RoomarrState): Layout {
+  return (
+    state.layouts.find((l) => l.id === state.activeLayoutId) ??
+    state.layouts[0] ?? { id: 'now', name: 'As it is now', kind: 'baseline', placements: [] }
+  );
+}
+
+export function selectActivePlacement(state: RoomarrState, itemId: string): Placement | undefined {
+  return selectActiveLayout(state).placements.find((p) => p.itemId === itemId);
 }
 
 /**
