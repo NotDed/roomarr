@@ -299,3 +299,42 @@
   fill: var(--walkable);
   fill-opacity: 0.8;
 }
+
+/* ── Snap guides ─────────────────────────────────────────────────────────── */
+
+/* Guides are transient and appear mid-gesture, so they must be legible at a
+   glance and never mistaken for something in the room. Solid, saturated, and
+   drawn over everything: a dashed line here would read as another ghost, and
+   ghosts mean "a proposed arrangement" everywhere else in the app. */
+.guide__line {
+  stroke: var(--focus);
+  stroke-opacity: 0.9;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.guide__label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  fill: var(--focus);
+  paint-order: stroke;
+  stroke: var(--paper-raised);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+/* Clearance and gap guides describe a rule rather than an object, so they get
+   the warning hue — landing on one usually means you are threading a
+   constraint rather than lining up with something you can see. */
+.guide--clearance .guide__line,
+.guide--gap .guide__line {
+  stroke: var(--warn);
+  stroke-dasharray: 5 4;
+}
+
+.guide--clearance .guide__label,
+.guide--gap .guide__label {
+  fill: var(--warn);
+}

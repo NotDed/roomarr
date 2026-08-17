@@ -4,6 +4,7 @@ import { ItemPanel } from '@/ui/ItemPanel';
 import { MetricPanel } from '@/ui/MetricPanel';
 import { ProblemsPanel } from '@/ui/ProblemsPanel';
 import { RoomForm } from '@/ui/RoomForm';
+import { SnapPanel } from '@/ui/SnapPanel';
 
 /**
  * The right-hand panel.
@@ -30,6 +31,10 @@ export function Inspector() {
 
       <section className="panel">
         <RoomForm />
+      </section>
+
+      <section className="panel">
+        <SnapPanel />
       </section>
 
       <section className="panel">

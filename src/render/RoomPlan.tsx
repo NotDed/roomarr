@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { type Feature, wallsById } from '@/core/features';
 import type { Item, Placement } from '@/core/items';
 import type { Pose } from '@/core/geometry';
@@ -7,11 +7,13 @@ import { type Rect, inflateRect } from '@/core/geometry';
 import { type Room, roomBounds, roomWalls } from '@/core/room';
 import { type DisplayUnit, formatLength } from '@/core/units';
 import { type WallNaming, nameWalls } from '@/core/wallnames';
+import type { SnapToggles } from '@/core/snapping';
 import type { WallId } from '@/core/wallrun';
 import { Features } from '@/render/Features';
 import { Items } from '@/render/Items';
 import { Ghosts } from '@/render/Ghosts';
 import { HeatOverlay } from '@/render/HeatOverlay';
+import { type GuideHandle, SnapGuides } from '@/render/SnapGuides';
 import { useItemDrag } from '@/render/useItemDrag';
 import {
   type Projector,
@@ -56,6 +58,8 @@ export interface RoomPlanProps {
   /** Fires on every drag frame with the candidate pose, for a live metric. */
   onItemPreview?: ((id: string, pose: Pose) => void) | undefined;
   snap?: number;
+  /** Which magnetic snaps are live while dragging. Omit for none. */
+  snapTo?: SnapToggles | undefined;
   /** Walkable-area result to paint underneath the plan. */
   heat?: WalkableResult | null | undefined;
   /** A proposed arrangement, drawn as ghosts over the current one. */
@@ -86,6 +90,7 @@ export function RoomPlan({
   onItemMove,
   onItemPreview,
   snap = 10,
+  snapTo,
   heat,
   ghostOf,
   onBackgroundClick,
@@ -112,12 +117,19 @@ export function RoomPlan({
   /* The drag lives here because this is where the projector is. Lifting the
      projector into the caller instead would mean two components computing the
      same fit and eventually disagreeing about it. */
+  /* The guides are driven through this rather than through props, so a drag
+     never re-renders the plan. See `SnapGuides`. */
+  const guides = useRef<GuideHandle | null>(null);
+
   const drag = useItemDrag({
     projector,
     items: items ?? [],
     placements: placements ?? [],
     bounds,
     snap,
+    room,
+    toggles: snapTo,
+    guides,
     onPreview: onItemPreview,
     onCommit: onItemMove ?? (() => {}),
   });
@@ -185,6 +197,10 @@ export function RoomPlan({
             onSelect={onSelectFeature}
           />
         )}
+
+        {/* Over the furniture, because a guide hidden behind the item it is
+            explaining explains nothing. */}
+        {onItemMove !== undefined && <SnapGuides projector={projector} handle={guides} />}
 
         <WallDimensions room={room} projector={projector} naming={naming} unit={unit} />
         <CornerTicks room={room} projector={projector} naming={naming} />

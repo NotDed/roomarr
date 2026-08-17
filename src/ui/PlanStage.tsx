@@ -49,6 +49,7 @@ export function PlanStage() {
 
   const bodyRadius = useStore((s) => s.bodyRadius);
   const showHeat = useStore((s) => s.showHeat);
+  const snapTo = useStore((s) => s.snapTo);
 
   const wallLabels = useMemo(() => wallLabelsByIndex(run, labelsById), [run, labelsById]);
   const wallIds = useMemo(() => (run === null ? [] : runWallIds(run)), [run]);
@@ -97,6 +98,7 @@ export function PlanStage() {
           onSelectItem={selectItem}
           onItemMove={moveItem}
           onItemPreview={(itemId, pose) => setPreview({ itemId, pose })}
+          snapTo={snapTo}
           heat={showHeat ? metric : null}
           ghostOf={ghost}
           onBackgroundClick={() => {

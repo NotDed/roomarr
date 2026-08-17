@@ -1,7 +1,10 @@
-import { useCallback, useRef } from 'react';
+import { type RefObject, useCallback, useRef } from 'react';
 import { type Pose, type Rect, type Size, rotatedSize } from '@/core/geometry';
 import type { Item, Placement } from '@/core/items';
+import type { Room } from '@/core/room';
+import { type SnapResult, type SnapToggles, collectTargets, snapRect } from '@/core/snapping';
 import { snapMm } from '@/core/units';
+import type { GuideHandle } from '@/render/SnapGuides';
 import { type Projector, toModel } from '@/render/projector';
 
 /**
@@ -35,11 +38,26 @@ export interface DragOptions {
    * which is a different problem with a different right answer.
    */
   bounds: Rect;
-  /** Grid the pose snaps to while dragging. Alt bypasses it. */
+  /** Grid the pose falls back to when no magnetic snap is near. Alt bypasses it. */
   snap: number;
+  /** Needed for wall targets. Omit to drag with magnetic snapping off. */
+  room?: Room | undefined;
+  toggles?: SnapToggles | undefined;
+  /** Guides are driven imperatively; see `SnapGuides`. */
+  guides?: RefObject<GuideHandle | null> | undefined;
   onPreview?: ((itemId: string, pose: Pose) => void) | undefined;
   onCommit: (itemId: string, pose: Pose) => void;
 }
+
+/**
+ * Snap tolerance, in paper units, converted through the projector.
+ *
+ * Specified on screen rather than in millimetres because that is where it is
+ * felt. A fixed 50 mm tolerance is a comfortable grab in a bedroom and an
+ * invisible one in a 9 m room zoomed to fit, even though the pointer is moving
+ * the same number of pixels in both.
+ */
+const TOLERANCE_PAPER = 8;
 
 function clamp(value: number, lo: number, hi: number): number {
   return hi < lo ? lo : value < lo ? lo : value > hi ? hi : value;
@@ -62,6 +80,9 @@ export function useItemDrag({
   placements,
   bounds,
   snap,
+  room,
+  toggles,
+  guides,
   onPreview,
   onCommit,
 }: DragOptions) {
@@ -80,11 +101,55 @@ export function useItemDrag({
       });
 
       const raw = { x: model.x - state.grabDx, y: model.y - state.grabDy };
-      /* Alt bypasses the grid, for the times when the room genuinely is not on
-         a round number. */
-      const stepped = event.altKey
-        ? { x: Math.round(raw.x), y: Math.round(raw.y) }
-        : { x: snapMm(raw.x, snap), y: snapMm(raw.y, snap) };
+      const rect: Rect = { x: raw.x, y: raw.y, w: size.w, d: size.d };
+
+      /* Alt is the single escape hatch, and it means the same thing for both
+         mechanisms: "I mean exactly here". Two separate modifiers for "ignore
+         the grid" and "ignore the snaps" would be two things to remember for
+         one intent. */
+      const free = event.altKey;
+
+      let snapped: SnapResult | null = null;
+      if (!free && room !== undefined && toggles !== undefined) {
+        /* Recollected every frame rather than once on pointer-down. The other
+           items do hold still, but the gap targets depend on where the moving
+           item currently is — which of them it overlaps decides which it can be
+           said to be "between". It is a hundred small objects per frame on a
+           furnished room, against a budget of 16 ms. */
+        const targets = collectTargets({
+          room,
+          items,
+          placements,
+          movingId: state.itemId,
+          movingRect: rect,
+          toggles,
+        });
+        snapped = snapRect(rect, targets, TOLERANCE_PAPER / projector.k);
+      }
+
+      if (snapped === null) guides?.current?.hide();
+      else guides?.current?.show(snapped.hits, { ...rect, x: snapped.x, y: snapped.y });
+
+      /* The grid is the fallback, not a second opinion. An axis that found a
+         magnetic target keeps it — rounding a wall-flush 0 to the nearest 10 is
+         harmless, but rounding a 1675 mm centre line to 1680 would silently
+         undo the snap the guide has just claimed happened. */
+      const held = new Set(snapped?.hits.map((hit) => hit.axis) ?? []);
+
+      const stepped = {
+        x:
+          held.has('x') && snapped !== null
+            ? snapped.x
+            : free
+              ? Math.round(raw.x)
+              : snapMm(raw.x, snap),
+        y:
+          held.has('y') && snapped !== null
+            ? snapped.y
+            : free
+              ? Math.round(raw.y)
+              : snapMm(raw.y, snap),
+      };
 
       return {
         ...state.startPose,
@@ -92,7 +157,7 @@ export function useItemDrag({
         y: clamp(stepped.y, bounds.y, bounds.y + bounds.d - size.d),
       };
     },
-    [projector, snap, bounds],
+    [projector, snap, bounds, room, toggles, items, placements, guides],
   );
 
   /** Hand the node back to React and drop the drag, without committing. */
@@ -100,6 +165,10 @@ export function useItemDrag({
     const state = drag.current;
     if (state === null) return;
     drag.current = null;
+
+    /* Guides describe a drag in progress. Left up after the drop they become
+       decoration that no longer refers to anything the pointer is doing. */
+    guides?.current?.hide();
 
     /* Clear the transform we were driving imperatively; the store update that
        follows (if any) re-renders the item at its real position. Leaving it in
@@ -110,7 +179,7 @@ export function useItemDrag({
     } catch {
       /* The pointer may already be gone; releasing it is best-effort. */
     }
-  }, []);
+  }, [guides]);
 
   const onPointerDown = useCallback(
     (itemId: string, event: React.PointerEvent) => {

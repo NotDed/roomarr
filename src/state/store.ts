@@ -41,6 +41,7 @@ import {
   roomWalls,
   validateOutline,
 } from '@/core/room';
+import { ALL_SNAPS, NO_SNAPS, type SnapToggles } from '@/core/snapping';
 import type { DisplayUnit, Mm } from '@/core/units';
 import { SCHEMA_VERSION } from '@/core/version';
 import {
@@ -142,6 +143,16 @@ export interface RoomarrState {
   showHeat: boolean;
 
   /**
+   * Which magnetic snaps are live while dragging.
+   *
+   * Four independent flags rather than one on/off, because they suit different
+   * moments. Laying a room out for the first time, edges and centres do all the
+   * work. Fitting one last thing into a room that is already tight, the
+   * clearance edges are the only ones worth having and the rest are in the way.
+   */
+  snapTo: SnapToggles;
+
+  /**
    * Soft warnings the user has acknowledged, keyed by what they are about.
    *
    * Only soft ones can be dismissed. A hard problem means the layout cannot be
@@ -216,6 +227,8 @@ export interface RoomarrState {
 
   setBodyRadius: (name: BodyRadiusName) => void;
   toggleHeat: () => void;
+  toggleSnap: (kind: keyof SnapToggles) => void;
+  setAllSnaps: (on: boolean) => void;
   setPreview: (preview: { itemId: string; pose: Pose } | null) => void;
   dismissProblem: (key: string) => void;
 
@@ -310,6 +323,7 @@ export const useStore = create<RoomarrState>()(
       nextItemId: 0,
       bodyRadius: 'comfort',
       showHeat: true,
+      snapTo: ALL_SNAPS,
       preview: null,
       dismissedProblems: [],
       suggestion: null,
@@ -550,6 +564,10 @@ export const useStore = create<RoomarrState>()(
 
       setBodyRadius: (bodyRadius) => set({ bodyRadius }),
       toggleHeat: () => set((state) => ({ showHeat: !state.showHeat })),
+
+      toggleSnap: (kind) =>
+        set((state) => ({ snapTo: { ...state.snapTo, [kind]: !state.snapTo[kind] } })),
+      setAllSnaps: (on) => set({ snapTo: on ? ALL_SNAPS : NO_SNAPS }),
       setPreview: (preview) => set({ preview }),
 
       /**
@@ -724,6 +742,7 @@ export const useStore = create<RoomarrState>()(
         nextItemId: state.nextItemId,
         bodyRadius: state.bodyRadius,
         showHeat: state.showHeat,
+        snapTo: state.snapTo,
         dismissedProblems: state.dismissedProblems,
         maxMoves: state.maxMoves,
       }),
