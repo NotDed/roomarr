@@ -1,0 +1,108 @@
+/* Plan drawing. Deliberately token-driven so `mode="print"` can swap the whole
+   palette to ink-on-paper without touching a single component. */
+
+.plan {
+  display: block;
+  max-width: 100%;
+  user-select: none;
+}
+
+.plan__floor {
+  fill: var(--paper-raised);
+  stroke: none;
+}
+
+.plan__wall {
+  fill: none;
+  stroke: var(--ink);
+  stroke-linejoin: miter;
+}
+
+.plan__wall--open {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── The closure gap ─────────────────────────────────────────────────────── */
+
+.plan__gap {
+  stroke: var(--warn);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.plan__gapdot {
+  fill: var(--warn);
+}
+
+.plan__gaptext {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--warn);
+}
+
+/* ── Dimensions ──────────────────────────────────────────────────────────── */
+
+.plan__dimline,
+.plan__dimtick {
+  stroke: var(--ink-faint);
+  stroke-width: 1;
+}
+
+.plan__dimtext {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  fill: var(--ink-muted);
+}
+
+.plan__walllabel {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  fill: var(--ink-faint);
+}
+
+.plan__cornertag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--ink-faint);
+}
+
+/* ── Scale bar ───────────────────────────────────────────────────────────── */
+
+.plan__scalebar line {
+  stroke: var(--ink-muted);
+  stroke-width: 1.25;
+}
+
+.plan__scaletext {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--ink-muted);
+}
+
+/* ── Print ───────────────────────────────────────────────────────────────── */
+
+.plan--print .plan__floor {
+  fill: #fff;
+}
+
+.plan--print .plan__wall {
+  stroke: #000;
+}
+
+.plan--print .plan__dimline,
+.plan--print .plan__dimtick,
+.plan--print .plan__scalebar line {
+  stroke: #444;
+}
+
+.plan--print .plan__dimtext,
+.plan--print .plan__walllabel,
+.plan--print .plan__cornertag,
+.plan--print .plan__scaletext {
+  fill: #222;
+}
