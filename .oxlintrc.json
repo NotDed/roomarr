@@ -18,7 +18,8 @@
     "unicorn/prefer-number-properties": "error",
 
     "react/react-in-jsx-scope": "off",
-    "import/no-named-as-default-member": "off"
+    "import/no-named-as-default-member": "off",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }]
   },
   "overrides": [
     {

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- A room in plan: walls with a gap for the door, the leaf swung open, and
+       the walkable floor filled. The whole app in 32 pixels. -->
+  <style>
+    .wall { fill: none; stroke: #1b1c1e; stroke-width: 3; stroke-linecap: square; }
+    .leaf { fill: none; stroke: #1b1c1e; stroke-width: 2; stroke-linecap: round; }
+    .floor { fill: #2f8f7a; }
+    @media (prefers-color-scheme: dark) {
+      .wall, .leaf { stroke: #e8e9ea; }
+      .floor { fill: #5cc0a6; }
+    }
+  </style>
+  <path class="floor" d="M5.5 5.5h21v21h-21z" opacity="0.22" />
+  <!-- walls, broken between x=11 and x=19 on the bottom for the doorway -->
+  <path class="wall" d="M5.5 26.5v-21h21v21h-7.5M11.5 26.5h-6" />
+  <!-- door leaf hinged at (11.5, 26.5), swung into the room -->
+  <path class="leaf" d="M11.5 26.5v-8" />
+  <path class="leaf" d="M19.5 26.5a8 8 0 0 0-8-8" opacity="0.5" />
+</svg>
