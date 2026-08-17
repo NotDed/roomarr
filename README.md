@@ -7,9 +7,11 @@ with a tape measure while you move things.
 
 No backend, no account, no upload. Everything runs in your browser.
 
-> **Status:** the input side and the metric work. Measure a room, place your doors,
-> windows and furniture, and watch the walkable figure move as you drag things around.
-> The optimizer and the printable blueprint are next — see [milestones](#milestones).
+> **Status:** usable end to end. Measure a room, place your doors, windows and furniture,
+> see what's wrong with it in plain sentences, and press one button to get a better
+> arrangement — which it will decline to give you if what you have is already the best it
+> found. Still to come: magnetic snapping, saved arrangements, a side-by-side compare, and
+> the printable blueprint. See [milestones](#milestones).
 
 ---
 
@@ -116,8 +118,8 @@ That boundary is enforced two ways, both of which have to keep passing:
 - [x] **M1** — units, geometry, room entry as a wall run
 - [x] **M2** — doors, windows, fixtures, furniture, your current arrangement
 - [x] **M3** — the walkable-area metric, live while you drag, with a heat overlay
-- [ ] **M4** — constraints and violations in plain sentences
-- [ ] **M5** — greedy auto-arrange
+- [x] **M4** — constraints and violations in plain sentences
+- [x] **M5** — greedy auto-arrange
 - [ ] **M6** — simulated annealing in a worker, plus a fixture bench
 - [ ] **M7** — three labelled options, move budget, per-item locks
 - [ ] **M8** — the printable blueprint and the move plan
