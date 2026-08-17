@@ -1,3 +1,4 @@
+import { describeMoves } from '@/core/archive';
 import { formatAreaM2, mm2ToM2 } from '@/core/units';
 import { useStore } from '@/state/store';
 
@@ -64,9 +65,7 @@ export function ArrangePanel() {
           <Delta suggestion={suggestion} />
 
           <ul className="arrange__facts">
-            <li>
-              {suggestion.moved.length} thing{suggestion.moved.length === 1 ? '' : 's'} move
-            </li>
+            <li>{describeMoves(suggestion.moved.length)}</li>
             {suggestion.beforeProblems > suggestion.afterProblems && (
               <li className="arrange__fixed">
                 {suggestion.beforeProblems - suggestion.afterProblems} problem
