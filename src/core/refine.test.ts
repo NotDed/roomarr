@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Pick, distance, labelPicks, selectDiverse } from '@/core/archive';
+import { distance, labelOptions, selectDiverse } from '@/core/archive';
 import { itemFromPreset } from '@/core/catalog';
 import { hardViolations } from '@/core/constraints';
 import type { Feature } from '@/core/features';
@@ -252,32 +252,48 @@ describe('selectDiverse', () => {
   });
 });
 
-describe('labelPicks', () => {
-  const pick = (score: number, moved: string[]): Pick => ({
-    candidate: { layout: layoutOf([]), score, moved, signature: `${score}` },
-    distinctness: 0,
-    label: '',
-  });
-
-  /* Labels come from what actually differs, not from a fixed list — a label
-     that describes the wrong option is worse than no label. */
-  it('names the best one for what makes it best', () => {
-    const labelled = labelPicks([pick(2, ['a', 'b', 'c']), pick(1, ['a'])]);
-    expect(labelled[0]?.label).toBe('Most open floor');
+describe('labelOptions', () => {
+  /* Labels are computed from the MEASURED figures, not from the search's
+     internal scores. Those are computed on a coarser grid and can rank two
+     options differently from the numbers shown beside them — which produced an
+     option labelled "Most open floor" sitting above one with more floor. */
+  it('names the option that actually has the most floor', () => {
+    const labels = labelOptions([
+      { walkableMm2: 9_400_000, moved: ['a', 'b', 'c'] },
+      { walkableMm2: 9_500_000, moved: ['a', 'b', 'c'] },
+    ]);
+    expect(labels[1]).toBe('Most open floor');
+    expect(labels[0]).not.toBe('Most open floor');
   });
 
   it('names the one that asks least of you', () => {
-    const labelled = labelPicks([pick(2, ['a', 'b', 'c']), pick(1.5, ['a'])]);
-    expect(labelled[1]?.label).toMatch(/Smallest change/);
-    expect(labelled[1]?.label).toMatch(/1 thing moves/);
+    const labels = labelOptions([
+      { walkableMm2: 9_500_000, moved: ['a', 'b', 'c'] },
+      { walkableMm2: 9_000_000, moved: ['a'] },
+    ]);
+    expect(labels[0]).toBe('Most open floor');
+    expect(labels[1]).toBe('Smallest change · 1 thing moves');
   });
 
   it('does not claim a smallest change when the best one already is', () => {
-    const labelled = labelPicks([pick(2, ['a']), pick(1.5, ['a', 'b'])]);
-    expect(labelled[1]?.label).not.toMatch(/Smallest change/);
+    const labels = labelOptions([
+      { walkableMm2: 9_500_000, moved: ['a'] },
+      { walkableMm2: 9_000_000, moved: ['a', 'b'] },
+    ]);
+    expect(labels[0]).toBe('Most open floor');
+    expect(labels[1]).not.toMatch(/Smallest change/);
+  });
+
+  it('gets the plural agreement right in both directions', () => {
+    expect(
+      labelOptions([
+        { walkableMm2: 9_500_000, moved: ['a', 'b', 'c'] },
+        { walkableMm2: 9_000_000, moved: ['a', 'b'] },
+      ])[1],
+    ).toBe('Smallest change · 2 things move');
   });
 
   it('handles being given nothing', () => {
-    expect(labelPicks([])).toEqual([]);
+    expect(labelOptions([])).toEqual([]);
   });
 });

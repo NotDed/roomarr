@@ -17,6 +17,10 @@
     "no-console": ["warn", { "allow": ["warn", "error"] }],
     "unicorn/prefer-number-properties": "error",
 
+    // targetOrigin is a `window.postMessage` parameter. On a Worker the second
+    // argument is a transfer list, so taking this rule's advice would break the
+    // call rather than secure it.
+    "unicorn/require-post-message-target-origin": "off",
     "react/react-in-jsx-scope": "off",
     // Wall-run segments have no stable identity — they are positions in an
     // ordered list, and reordering IS the edit. Fields that hold draft text

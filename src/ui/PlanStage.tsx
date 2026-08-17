@@ -40,6 +40,12 @@ export function PlanStage() {
   const moveItem = useStore((s) => s.moveItem);
   const setPreview = useStore((s) => s.setPreview);
   const suggestion = useStore((s) => s.suggestion);
+  /* Only the option currently selected is ghosted. Drawing all three at once
+     would be an unreadable thicket rather than a comparison. */
+  const ghost =
+    suggestion !== null && !suggestion.keptOriginal
+      ? (suggestion.options[suggestion.chosen]?.layout.placements ?? null)
+      : null;
 
   const bodyRadius = useStore((s) => s.bodyRadius);
   const showHeat = useStore((s) => s.showHeat);
@@ -92,7 +98,7 @@ export function PlanStage() {
           onItemMove={moveItem}
           onItemPreview={(itemId, pose) => setPreview({ itemId, pose })}
           heat={showHeat ? metric : null}
-          ghostOf={suggestion?.keptOriginal === false ? suggestion.layout.placements : null}
+          ghostOf={ghost}
           onBackgroundClick={() => {
             selectItem(null);
             selectFeature(null);

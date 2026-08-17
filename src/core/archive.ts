@@ -139,24 +139,30 @@ export function selectDiverse(
 /**
  * Name each option by what actually distinguishes it.
  *
- * Generated from the results rather than fixed, because "Most open floor" is
- * only true of one of them and only sometimes. A label that describes the wrong
- * option is worse than no label.
+ * Deliberately takes the **measured** figures rather than the search's internal
+ * scores. Those are computed on a coarser grid, and they can rank two options
+ * differently from the numbers shown beside them — which produced an option
+ * labelled "Most open floor" sitting above one with more floor. A label that
+ * contradicts the number next to it is worse than no label at all.
  */
-export function labelPicks(picks: readonly Pick[]): Pick[] {
-  if (picks.length === 0) return [];
+export function labelOptions(
+  options: readonly { walkableMm2: number; moved: readonly string[] }[],
+): string[] {
+  if (options.length === 0) return [];
 
-  const fewest = picks.reduce((a, b) =>
-    a.candidate.moved.length <= b.candidate.moved.length ? a : b,
-  );
-  const bestScore = picks.reduce((a, b) => (a.candidate.score >= b.candidate.score ? a : b));
+  let bestFloor = 0;
+  let fewestMoves = 0;
+  for (const [i, option] of options.entries()) {
+    if (option.walkableMm2 > (options[bestFloor]?.walkableMm2 ?? 0)) bestFloor = i;
+    if (option.moved.length < (options[fewestMoves]?.moved.length ?? Infinity)) fewestMoves = i;
+  }
 
-  return picks.map((pick, index) => {
-    if (pick === bestScore) return { ...pick, label: 'Most open floor' };
-    if (pick === fewest && fewest.candidate.moved.length < bestScore.candidate.moved.length) {
-      return { ...pick, label: `Smallest change · ${describeMoves(pick.candidate.moved.length)}` };
+  return options.map((option, i) => {
+    if (i === bestFloor) return 'Most open floor';
+    if (i === fewestMoves && option.moved.length < (options[bestFloor]?.moved.length ?? 0)) {
+      return `Smallest change · ${describeMoves(option.moved.length)}`;
     }
-    return { ...pick, label: `Another idea ${index}` };
+    return 'A different arrangement';
   });
 }
 

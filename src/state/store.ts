@@ -12,7 +12,7 @@ import {
 import { doorLandingZone } from '@/core/openings';
 import { itemFromPreset } from '@/core/catalog';
 import { type Violation, checkLayout } from '@/core/constraints';
-import { autoArrange } from '@/core/greedy';
+import type { FromWorker, SearchOption, SearchRequest } from '@/workers/protocol';
 import {
   type Pose,
   type Rect,
@@ -78,15 +78,19 @@ import {
  * plan.
  */
 
-/** A proposed arrangement, with everything needed to decide about it. */
+/**
+ * What the search came back with.
+ *
+ * Several options rather than one, because a single answer is an edict and a
+ * short list of genuinely different ideas is advice. `chosen` is which one the
+ * plan is currently previewing; nothing is applied until Keep.
+ */
 export interface Suggestion {
-  layout: Layout;
-  beforeMm2: number;
-  afterMm2: number;
-  beforeProblems: number;
-  afterProblems: number;
-  moved: string[];
+  options: SearchOption[];
+  chosen: number;
+  baseline: { walkableMm2: number; hardProblems: number; softProblems: number };
   keptOriginal: boolean;
+  ms: number;
 }
 
 export interface RoomarrState {
@@ -165,7 +169,15 @@ export interface RoomarrState {
    * fill with near-identical runs you then prune by hand.
    */
   suggestion: Suggestion | null;
-  arranging: boolean;
+  /** Non-null while a search is running, with rough progress in it. */
+  searching: { evals: number; attempt: number; attempts: number } | null;
+  /**
+   * Cap on how many things the search may move.
+   *
+   * Null means no cap. A count rather than a weight, because the same weight
+   * means something different in a four-item room and a twenty-item one.
+   */
+  maxMoves: number | null;
   /**
    * Counter behind wall ids. Persisted so ids stay unique across reloads — a
    * counter that restarted at zero would hand a fresh wall the id of one that
@@ -208,6 +220,9 @@ export interface RoomarrState {
   dismissProblem: (key: string) => void;
 
   runAutoArrange: () => void;
+  cancelAutoArrange: () => void;
+  chooseOption: (index: number) => void;
+  setMaxMoves: (max: number | null) => void;
   keepSuggestion: () => void;
   discardSuggestion: () => void;
 
@@ -235,6 +250,45 @@ function roomFromRun(run: WallRun, previous: Room | null): Room | null {
   };
 }
 
+/**
+ * One worker for the session, created the first time a search is asked for.
+ *
+ * Lazily, because most of the time nobody presses the button, and spinning one
+ * up at import would cost every visitor a thread they may never use.
+ */
+let workerRef: Worker | null = null;
+let searchRunId = 0;
+
+interface WorkerHandlers {
+  onProgress: (message: Extract<FromWorker, { kind: 'progress' }>) => void;
+  onResult: (message: Extract<FromWorker, { kind: 'result' }>) => void;
+  onFailed: (message: Extract<FromWorker, { kind: 'failed' }>) => void;
+}
+
+let handlers: WorkerHandlers | null = null;
+
+function ensureWorker(next: WorkerHandlers): Worker {
+  handlers = next;
+  if (workerRef !== null) return workerRef;
+
+  /* `new URL(..., import.meta.url)` rather than a string path: it is what lets
+     the bundler fingerprint the worker and resolve it under the app's base
+     path. A plain path works in dev and 404s in production, which is a
+     miserable thing to discover after deploying. */
+  workerRef = new Worker(new URL('../workers/optimizer.worker.ts', import.meta.url), {
+    type: 'module',
+  });
+
+  workerRef.addEventListener('message', (event: MessageEvent<FromWorker>) => {
+    const message = event.data;
+    if (message.kind === 'progress') handlers?.onProgress(message);
+    else if (message.kind === 'result') handlers?.onResult(message);
+    else handlers?.onFailed(message);
+  });
+
+  return workerRef;
+}
+
 export const useStore = create<RoomarrState>()(
   persist(
     (set, get) => ({
@@ -259,7 +313,8 @@ export const useStore = create<RoomarrState>()(
       preview: null,
       dismissedProblems: [],
       suggestion: null,
-      arranging: false,
+      searching: null,
+      maxMoves: null,
 
       setUnit: (unit) => set({ unit }),
 
@@ -498,18 +553,60 @@ export const useStore = create<RoomarrState>()(
       setPreview: (preview) => set({ preview }),
 
       /**
-       * Search for a better arrangement.
+       * Search for a better arrangement, off the main thread.
        *
-       * Synchronous: the greedy pass takes about half a second on a furnished
-       * bedroom, which is inside the window where a button press still feels
-       * like a button press. When the annealing search lands it will need a
-       * worker; this does not.
+       * Half a second of arithmetic on the main thread is half a second where
+       * the plan will not redraw and clicks do nothing, which reads as the app
+       * having frozen rather than as it thinking.
        */
       runAutoArrange: () => {
         const state = get();
         if (state.room === null || state.run === null || state.items.length === 0) return;
 
-        const result = autoArrange({
+        const runId = searchRunId + 1;
+        searchRunId = runId;
+
+        set({
+          searching: { evals: 0, attempt: 0, attempts: 0 },
+          suggestion: null,
+        });
+
+        const worker = ensureWorker({
+          onProgress: (message) => {
+            if (message.runId !== searchRunId) return;
+            set({
+              searching: {
+                evals: message.evals,
+                attempt: message.attempt,
+                attempts: message.attempts,
+              },
+            });
+          },
+          onResult: (message) => {
+            /* A reply from a run that has been superseded or cancelled is
+               dropped rather than shown — otherwise a slow first search can
+               overwrite the answer to a later, faster one. */
+            if (message.runId !== searchRunId) return;
+            set({
+              searching: null,
+              suggestion: {
+                options: message.options,
+                chosen: 0,
+                baseline: message.baseline,
+                keptOriginal: message.keptOriginal,
+                ms: message.ms,
+              },
+            });
+          },
+          onFailed: (message) => {
+            if (message.runId !== searchRunId) return;
+            set({ searching: null, suggestion: null });
+          },
+        });
+
+        const request: SearchRequest = {
+          kind: 'search',
+          runId,
           room: state.room,
           items: state.items,
           layout: selectActiveLayout(state),
@@ -517,28 +614,35 @@ export const useStore = create<RoomarrState>()(
           wallIds: runWallIds(state.run),
           roomIsSleeping: state.roomType === 'bedroom',
           seed: state.nextItemId * 7 + state.items.length,
-        });
-
-        set({
-          suggestion: {
-            layout: result.layout,
-            beforeMm2: result.baseline.walkableMm2,
-            afterMm2: result.score.walkableMm2,
-            beforeProblems: result.baseline.violations.filter((v) => v.severity === 'hard').length,
-            afterProblems: result.score.violations.filter((v) => v.severity === 'hard').length,
-            moved: result.moved,
-            keptOriginal: result.keptOriginal,
-          },
-        });
+          ...(state.maxMoves === null ? {} : { maxMoves: state.maxMoves }),
+        };
+        worker.postMessage(request);
       },
+
+      cancelAutoArrange: () => {
+        const runId = searchRunId;
+        searchRunId = runId + 1;
+        workerRef?.postMessage({ kind: 'cancel', runId });
+        set({ searching: null });
+      },
+
+      chooseOption: (index) =>
+        set((state) =>
+          state.suggestion === null
+            ? state
+            : { suggestion: { ...state.suggestion, chosen: index } },
+        ),
+
+      setMaxMoves: (maxMoves) => set({ maxMoves }),
 
       keepSuggestion: () => {
         const { suggestion, activeLayoutId } = get();
-        if (suggestion === null) return;
+        const option = suggestion?.options[suggestion.chosen];
+        if (option === undefined) return;
 
         set((state) => ({
           layouts: state.layouts.map((l) =>
-            l.id === activeLayoutId ? { ...l, placements: suggestion.layout.placements } : l,
+            l.id === activeLayoutId ? { ...l, placements: option.layout.placements } : l,
           ),
           suggestion: null,
         }));
@@ -621,6 +725,7 @@ export const useStore = create<RoomarrState>()(
         bodyRadius: state.bodyRadius,
         showHeat: state.showHeat,
         dismissedProblems: state.dismissedProblems,
+        maxMoves: state.maxMoves,
       }),
     },
   ),
