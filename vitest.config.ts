@@ -46,6 +46,18 @@ export default defineConfig({
           include: ['tests/**/*.test.ts'],
         },
       },
+      {
+        /* The bench. Outside `core` because it measures core rather than being
+           part of it — it prints and it times, and the core boundary rightly
+           forbids both. Its own project so it can be run alone while iterating
+           on the weights, which is when its output is worth reading. */
+        extends: true,
+        test: {
+          name: 'bench',
+          environment: 'node',
+          include: ['bench/**/*.test.ts'],
+        },
+      },
     ],
     coverage: {
       provider: 'v8',
