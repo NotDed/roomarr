@@ -1,0 +1,14 @@
+{
+  /* Typechecks src/core in isolation, with no DOM and no JSX in `lib`.
+     This is half of how the "core is a zero-dependency, DOM-free, React-free
+     library" boundary is enforced — the other half is the eslint rule.
+     If anything in core reaches for `document`, `window`, `localStorage` or a
+     React import, this config fails and the main one would not have. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "jsx": "preserve",
+    "types": []
+  },
+  "include": ["src/core"]
+}
