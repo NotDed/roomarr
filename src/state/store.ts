@@ -11,19 +11,31 @@ import {
 } from '@/core/features';
 import { doorLandingZone } from '@/core/openings';
 import { itemFromPreset } from '@/core/catalog';
-import { type Pose, type Rect, rectsOverlap, rotateAbout, translatePose } from '@/core/geometry';
+import { type Violation, checkLayout } from '@/core/constraints';
+import {
+  type Pose,
+  type Rect,
+  type Rot,
+  rectsOverlap,
+  rotateAbout,
+  rotatedSize,
+  translatePose,
+} from '@/core/geometry';
 import {
   type ClearanceRule,
   type Item,
   type ItemType,
   type Layout,
   type Placement,
+  clearanceRect,
   itemRect,
 } from '@/core/items';
 import {
   type Room,
   type Wall,
+  distanceToNearestWall,
   makeRectangularRoom,
+  rectInsideRoom,
   roomBounds,
   roomWalls,
   validateOutline,
@@ -114,6 +126,15 @@ export interface RoomarrState {
   showHeat: boolean;
 
   /**
+   * Soft warnings the user has acknowledged, keyed by what they are about.
+   *
+   * Only soft ones can be dismissed. A hard problem means the layout cannot be
+   * used, and letting someone silence that would turn the panel into a place
+   * where real breakage hides.
+   */
+  dismissedProblems: string[];
+
+  /**
    * The pose an item is being dragged toward, before it is committed.
    *
    * Lives in the store so the headline figure can track a drag frame by frame
@@ -161,6 +182,7 @@ export interface RoomarrState {
   setBodyRadius: (name: BodyRadiusName) => void;
   toggleHeat: () => void;
   setPreview: (preview: { itemId: string; pose: Pose } | null) => void;
+  dismissProblem: (key: string) => void;
 
   reset: () => void;
 }
@@ -208,6 +230,7 @@ export const useStore = create<RoomarrState>()(
       bodyRadius: 'comfort',
       showHeat: true,
       preview: null,
+      dismissedProblems: [],
 
       setUnit: (unit) => set({ unit }),
 
@@ -445,6 +468,13 @@ export const useStore = create<RoomarrState>()(
       toggleHeat: () => set((state) => ({ showHeat: !state.showHeat })),
       setPreview: (preview) => set({ preview }),
 
+      dismissProblem: (key) =>
+        set((state) =>
+          state.dismissedProblems.includes(key)
+            ? state
+            : { dismissedProblems: [...state.dismissedProblems, key] },
+        ),
+
       reset: () =>
         set({
           run: null,
@@ -512,6 +542,7 @@ export const useStore = create<RoomarrState>()(
         nextItemId: state.nextItemId,
         bodyRadius: state.bodyRadius,
         showHeat: state.showHeat,
+        dismissedProblems: state.dismissedProblems,
       }),
     },
   ),
@@ -633,7 +664,6 @@ function firstFreePose(
   if (room === null) return { x: 0, y: 0, rot: 0 };
 
   const bounds = roomBounds(room);
-  const size = item.footprint;
   const inset = 50;
 
   const taken: Rect[] = layout.placements.flatMap((p) => {
@@ -667,28 +697,68 @@ function firstFreePose(
   const startFromRight = doorPoint.x - bounds.x < bounds.w / 2;
   const startFromBottom = doorPoint.y - bounds.y < bounds.d / 2;
 
-  const maxX = bounds.x + bounds.w - size.w - inset;
-  const maxY = bounds.y + bounds.d - size.d - inset;
   const minX = bounds.x + inset;
   const minY = bounds.y + inset;
-
   const step = 100;
+
   for (let row = 0; row < 40; row++) {
     for (let col = 0; col < 60; col++) {
+      /* Orientation is decided per position, because it depends on which wall
+         the item lands against. */
+      const probe = { x: 0, y: 0, w: item.footprint.w, d: item.footprint.d };
+      const rot = facingIntoRoom(room, {
+        ...probe,
+        x: startFromRight ? bounds.x + bounds.w - probe.w - inset - col * step : minX + col * step,
+        y: startFromBottom ? bounds.y + bounds.d - probe.d - inset - row * step : minY + row * step,
+      });
+
+      const size = rotatedSize(item.footprint, rot);
+      const maxX = bounds.x + bounds.w - size.w - inset;
+      const maxY = bounds.y + bounds.d - size.d - inset;
       const x = startFromRight ? maxX - col * step : minX + col * step;
       const y = startFromBottom ? maxY - row * step : minY + row * step;
       if (x < minX || x > maxX || y < minY || y > maxY) continue;
 
       const candidate: Rect = { x, y, w: size.w, d: size.d };
-      if (!taken.some((t) => rectsOverlap(t, candidate))) {
-        return { x: Math.round(x), y: Math.round(y), rot: 0 };
-      }
+      if (taken.some((t) => rectsOverlap(t, candidate))) continue;
+
+      /* The clearance an item needs has to land on floor, not in masonry. This
+         is what stops a freshly added wardrobe reporting "5 cm in front of it"
+         before you have touched anything. */
+      const pose: Pose = { x: Math.round(x), y: Math.round(y), rot };
+      const trial: Placement = { itemId: item.id, pose, locked: false };
+      const clearancesFit = item.clearances.every((rule) =>
+        rectInsideRoom(room, clearanceRect(item, trial, rule)),
+      );
+      if (!clearancesFit && row + col > 0) continue;
+
+      return pose;
     }
   }
 
   /* Everything is crowded. Put it somewhere visible and let the user sort it
      out — refusing to add the item would be worse. */
   return { x: Math.round(minX), y: Math.round(minY), rot: 0 };
+}
+
+/**
+ * The rotation that turns an item's usable face toward the room.
+ *
+ * A wardrobe dropped against a wall with its doors pointing into the masonry
+ * is a violation the moment it appears, before the user has touched anything —
+ * which reads as the tool being broken rather than as advice. Since `front` is
+ * +y at rotation 0, matching it to the nearest wall's inward normal is a
+ * lookup, not a search.
+ */
+function facingIntoRoom(room: Room, rect: Rect): Rot {
+  const near = distanceToNearestWall(room, rect);
+  const inward = near.wall?.inward;
+  if (inward === undefined) return 0;
+
+  if (inward.x === 0 && inward.y === 1) return 0;
+  if (inward.x === -1) return 1;
+  if (inward.x === 0 && inward.y === -1) return 2;
+  return 3;
 }
 
 /**
@@ -721,5 +791,35 @@ export function computeMetric(
     features,
     wallIds: runWallIds(run),
     radius: BODY_RADII[bodyRadius],
+  });
+}
+
+/**
+ * What is wrong with a layout.
+ *
+ * Like the metric, a plain function rather than a zustand selector: it
+ * allocates a fresh array every call and zustand v5 compares snapshots by
+ * reference, so using it as a selector would re-render forever. Callers pass
+ * stable slices and wrap it in a `useMemo`.
+ */
+export function computeViolations(
+  room: Room | null,
+  run: WallRun | null,
+  items: readonly Item[],
+  layout: Layout,
+  features: readonly Feature[],
+  roomType: RoomarrState['roomType'],
+  unit: DisplayUnit,
+): Violation[] {
+  if (room === null || run === null) return [];
+
+  return checkLayout({
+    room,
+    items,
+    layout,
+    features,
+    wallIds: runWallIds(run),
+    roomIsSleeping: roomType === 'bedroom',
+    unit,
   });
 }
