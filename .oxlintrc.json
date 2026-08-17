@@ -18,6 +18,10 @@
     "unicorn/prefer-number-properties": "error",
 
     "react/react-in-jsx-scope": "off",
+    // Wall-run segments have no stable identity — they are positions in an
+    // ordered list, and reordering IS the edit. Fields that hold draft text
+    // reset it when the committed value changes underneath instead.
+    "react/no-array-index-key": "off",
     "import/no-named-as-default-member": "off",
     "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }]
   },

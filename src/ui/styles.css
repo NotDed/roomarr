@@ -359,3 +359,187 @@ button {
   font-size: 13px;
   color: var(--ink-faint);
 }
+
+/* ── Room form ───────────────────────────────────────────────────────────── */
+
+.roomform {
+  display: grid;
+  gap: 10px;
+}
+
+.roomform__head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.roomform__head .panel__title {
+  margin-bottom: 0;
+}
+
+.roomform__hint {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+.roomform__area {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.roomform__add {
+  justify-self: start;
+  font-size: 13px;
+}
+
+.unittoggle {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+
+.unittoggle__btn {
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--paper);
+  border: none;
+  border-right: 1px solid var(--rule);
+}
+
+.unittoggle__btn:last-child {
+  border-right: none;
+}
+
+.unittoggle__btn--on {
+  font-weight: 600;
+  color: #fff;
+  background: var(--walkable);
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
+
+.field {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.field--inline {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
+.field label {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.field input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 8px;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+
+.field__input--bad {
+  border-color: var(--danger);
+}
+
+.field__unit {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* ── Wall list ───────────────────────────────────────────────────────────── */
+
+.walllist {
+  display: grid;
+  gap: 5px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.walllist__row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.walllist__num {
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+.turnbtn,
+.iconbtn {
+  padding: 4px 7px;
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+
+.turnbtn:hover,
+.iconbtn:hover:not(:disabled) {
+  border-color: var(--walkable);
+}
+
+.iconbtn:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.linkbtn {
+  justify-self: start;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+/* ── Closure readout ─────────────────────────────────────────────────────── */
+
+/* The live check that makes a wall run worth entering. A transposed digit shows
+   up here the moment it is typed. */
+.closure {
+  display: grid;
+  gap: 8px;
+  padding: 9px 11px;
+  font-size: 12.5px;
+  border: 1px solid;
+  border-radius: var(--radius);
+}
+
+.closure--ok {
+  color: var(--walkable);
+  background: var(--walkable-soft);
+  border-color: transparent;
+}
+
+.closure--gap {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+}
+
+.closure__fix {
+  justify-self: start;
+  font-size: 12px;
+}

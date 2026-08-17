@@ -1,17 +1,15 @@
+import { RoomForm } from '@/ui/RoomForm';
+
 /**
- * The right-hand panel. Its job across the whole app is "details of the thing
- * you have selected, and nothing else" — room dimensions, one item's real
- * measurements, or the violations attached to a selection.
- *
- * Sections are stubbed rather than hidden so the frame's proportions are honest
- * from the start; each one is filled in by the milestone that owns it.
+ * The right-hand panel: details of whatever you have selected, and nothing
+ * else. Sections below "Room" are stubbed rather than hidden so the frame's
+ * proportions stay honest; each is filled in by the milestone that owns it.
  */
 export function Inspector() {
   return (
     <aside className="inspector" aria-label="Inspector">
       <section className="panel">
-        <h2 className="panel__title">Room</h2>
-        <p className="panel__empty">No room yet.</p>
+        <RoomForm />
       </section>
 
       <section className="panel">
