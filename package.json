@@ -1,0 +1,19 @@
+{
+  "name": "roomarr",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A room layout sandbox that optimizes for free walkable area, and prints a blueprint you can rearrange your room with.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}
