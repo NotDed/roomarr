@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { type Feature, wallsById } from '@/core/features';
 import type { Item, Placement } from '@/core/items';
 import type { Pose } from '@/core/geometry';
+import type { WalkableResult } from '@/core/walkable';
 import { type Rect, inflateRect } from '@/core/geometry';
 import { type Room, roomBounds, roomWalls } from '@/core/room';
 import { type DisplayUnit, formatLength } from '@/core/units';
@@ -9,6 +10,7 @@ import { type WallNaming, nameWalls } from '@/core/wallnames';
 import type { WallId } from '@/core/wallrun';
 import { Features } from '@/render/Features';
 import { Items } from '@/render/Items';
+import { HeatOverlay } from '@/render/HeatOverlay';
 import { useItemDrag } from '@/render/useItemDrag';
 import {
   type Projector,
@@ -53,6 +55,8 @@ export interface RoomPlanProps {
   /** Fires on every drag frame with the candidate pose, for a live metric. */
   onItemPreview?: ((id: string, pose: Pose) => void) | undefined;
   snap?: number;
+  /** Walkable-area result to paint underneath the plan. */
+  heat?: WalkableResult | null | undefined;
   onBackgroundClick?: (() => void) | undefined;
 
   mode?: PlanMode;
@@ -79,6 +83,7 @@ export function RoomPlan({
   onItemMove,
   onItemPreview,
   snap = 10,
+  heat,
   onBackgroundClick,
   mode = 'screen',
 }: RoomPlanProps) {
@@ -107,68 +112,74 @@ export function RoomPlan({
     projector,
     items: items ?? [],
     placements: placements ?? [],
+    bounds,
     snap,
     onPreview: onItemPreview,
     onCommit: onItemMove ?? (() => {}),
   });
 
   return (
-    <svg
-      className={`plan plan--${mode}`}
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label="Floor plan of the room"
-      onPointerMove={onItemMove === undefined ? undefined : drag.onPointerMove}
-      onPointerUp={onItemMove === undefined ? undefined : drag.onPointerUp}
-      onPointerCancel={onItemMove === undefined ? undefined : drag.onPointerCancel}
-      onPointerDown={(event) => {
-        /* Clicking bare floor clears the selection. Items stop the event from
+    <div className="planhost" style={{ width, height }}>
+      {heat !== null && heat !== undefined && (
+        <HeatOverlay result={heat} projector={projector} width={width} height={height} />
+      )}
+      <svg
+        className={`plan plan--${mode}`}
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="Floor plan of the room"
+        onPointerMove={onItemMove === undefined ? undefined : drag.onPointerMove}
+        onPointerUp={onItemMove === undefined ? undefined : drag.onPointerUp}
+        onPointerCancel={onItemMove === undefined ? undefined : drag.onPointerCancel}
+        onPointerDown={(event) => {
+          /* Clicking bare floor clears the selection. Items stop the event from
            reaching here, so this only fires on the background. */
-        if (event.target === event.currentTarget) onBackgroundClick?.();
-      }}
-    >
-      <g transform={geometryTransform(projector)}>
-        {/* The floor. Filled so the room reads as a solid object rather than an
+          if (event.target === event.currentTarget) onBackgroundClick?.();
+        }}
+      >
+        <g transform={geometryTransform(projector)}>
+          {/* The floor. Filled so the room reads as a solid object rather than an
             outline drifting on the grid. */}
-        <path className="plan__floor" d={path} />
-        {/* Walls drawn inside the outline: the outline is the INSIDE face, which
+          <path className="plan__floor" d={path} />
+          {/* Walls drawn inside the outline: the outline is the INSIDE face, which
             is what a tape measure reports, so the thickness has to go outward
             visually while the dimensions stay true to the inside. */}
-        <path
-          className="plan__wall"
-          d={path}
-          strokeWidth={sw(projector, mode === 'print' ? 0.8 : 2.5)}
-        />
-      </g>
+          <path
+            className="plan__wall"
+            d={path}
+            strokeWidth={sw(projector, mode === 'print' ? 0.8 : 2.5)}
+          />
+        </g>
 
-      {items !== undefined && placements !== undefined && placements.length > 0 && (
-        <Items
-          items={items}
-          placements={placements}
-          projector={projector}
-          unit={unit}
-          selectedId={selectedItemId ?? null}
-          onSelect={onSelectItem}
-          onPointerDown={onItemMove === undefined ? undefined : drag.onPointerDown}
-        />
-      )}
+        {items !== undefined && placements !== undefined && placements.length > 0 && (
+          <Items
+            items={items}
+            placements={placements}
+            projector={projector}
+            unit={unit}
+            selectedId={selectedItemId ?? null}
+            onSelect={onSelectItem}
+            onPointerDown={onItemMove === undefined ? undefined : drag.onPointerDown}
+          />
+        )}
 
-      {features !== undefined && features.length > 0 && (
-        <Features
-          features={features}
-          wallsById={byId}
-          projector={projector}
-          selectedId={selectedFeatureId ?? null}
-          onSelect={onSelectFeature}
-        />
-      )}
+        {features !== undefined && features.length > 0 && (
+          <Features
+            features={features}
+            wallsById={byId}
+            projector={projector}
+            selectedId={selectedFeatureId ?? null}
+            onSelect={onSelectFeature}
+          />
+        )}
 
-      <WallDimensions room={room} projector={projector} naming={naming} unit={unit} />
-      <CornerTicks room={room} projector={projector} naming={naming} />
-      <ScaleBar projector={projector} unit={unit} height={height} />
-    </svg>
+        <WallDimensions room={room} projector={projector} naming={naming} unit={unit} />
+        <CornerTicks room={room} projector={projector} naming={naming} />
+        <ScaleBar projector={projector} unit={unit} height={height} />
+      </svg>
+    </div>
   );
 }
 

@@ -1,5 +1,6 @@
 import { FeaturePanel } from '@/ui/FeaturePanel';
 import { ItemPanel } from '@/ui/ItemPanel';
+import { MetricPanel } from '@/ui/MetricPanel';
 import { RoomForm } from '@/ui/RoomForm';
 
 /**
@@ -10,6 +11,10 @@ import { RoomForm } from '@/ui/RoomForm';
 export function Inspector() {
   return (
     <aside className="inspector" aria-label="Inspector">
+      <section className="panel panel--metric">
+        <MetricPanel />
+      </section>
+
       <section className="panel">
         <RoomForm />
       </section>
@@ -20,11 +25,6 @@ export function Inspector() {
 
       <section className="panel">
         <ItemPanel />
-      </section>
-
-      <section className="panel">
-        <h2 className="panel__title">Problems</h2>
-        <p className="panel__empty">Nothing to check yet.</p>
       </section>
     </aside>
   );

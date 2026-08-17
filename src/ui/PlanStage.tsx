@@ -3,6 +3,7 @@ import { RoomPlan } from '@/render/RoomPlan';
 import { RunPreview } from '@/render/RunPreview';
 import { runWallIds } from '@/core/wallrun';
 import {
+  computeMetric,
   selectActiveLayout,
   selectDoorWallIndex,
   useStore,
@@ -37,9 +38,20 @@ export function PlanStage() {
   const selectedItemId = useStore((s) => s.selectedItemId);
   const selectItem = useStore((s) => s.selectItem);
   const moveItem = useStore((s) => s.moveItem);
+  const setPreview = useStore((s) => s.setPreview);
+
+  const bodyRadius = useStore((s) => s.bodyRadius);
+  const showHeat = useStore((s) => s.showHeat);
 
   const wallLabels = useMemo(() => wallLabelsByIndex(run, labelsById), [run, labelsById]);
   const wallIds = useMemo(() => (run === null ? [] : runWallIds(run)), [run]);
+
+  /* Keyed on exactly what the answer depends on. Anything else in the store
+     changing — a selection, a wall label — must not pay for a recompute. */
+  const metric = useMemo(
+    () => computeMetric(room, run, items, layout, features, bodyRadius),
+    [room, run, items, layout, features, bodyRadius],
+  );
   const [box, setBox] = useState({ width: 0, height: 0 });
   const hostRef = useRef<HTMLDivElement>(null);
 
@@ -77,6 +89,8 @@ export function PlanStage() {
           selectedItemId={selectedItemId}
           onSelectItem={selectItem}
           onItemMove={moveItem}
+          onItemPreview={(itemId, pose) => setPreview({ itemId, pose })}
+          heat={showHeat ? metric : null}
           onBackgroundClick={() => {
             selectItem(null);
             selectFeature(null);

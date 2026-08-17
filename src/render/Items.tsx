@@ -137,7 +137,7 @@ const ItemShape = memo(function ItemShape({
       {roomy && (
         <>
           <text className="item__name" x={cx} y={cy - 5} textAnchor="middle">
-            {item.name}
+            {fit(item.name, w)}
           </text>
           <text className="item__dims num" x={cx} y={cy + 8} textAnchor="middle">
             {formatLength(item.footprint.w, unit)} × {formatLength(item.footprint.d, unit)}
@@ -153,3 +153,18 @@ const ItemShape = memo(function ItemShape({
     </g>
   );
 });
+
+/**
+ * Trim a label to what its box can actually hold.
+ *
+ * SVG text neither wraps nor clips, so a long name runs straight out over the
+ * neighbouring furniture. Estimating from the average glyph width is crude, but
+ * this is a drawing that gets printed and measured off — a name spilling across
+ * two items is worse than a truncated one.
+ */
+function fit(text: string, boxWidth: number): string {
+  const perChar = 5.6; // 10.5px UI font, measured empirically
+  const max = Math.floor((boxWidth - 8) / perChar);
+  if (max <= 1) return '';
+  return text.length <= max ? text : `${text.slice(0, Math.max(1, max - 1))}…`;
+}

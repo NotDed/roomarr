@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import type { Pose } from '@/core/geometry';
+import { type Pose, type Rect, type Size, rotatedSize } from '@/core/geometry';
 import type { Item, Placement } from '@/core/items';
 import { snapMm } from '@/core/units';
 import { type Projector, toModel } from '@/render/projector';
@@ -26,10 +26,23 @@ export interface DragOptions {
   projector: Projector;
   items: readonly Item[];
   placements: readonly Placement[];
+  /**
+   * The room's bounding box. A drag is clamped to keep the item inside it.
+   *
+   * This is not the "item must be inside the room" constraint — that belongs to
+   * the constraint checker, which can explain a violation instead of silently
+   * preventing it. This only stops an item being flung off the canvas and lost,
+   * which is a different problem with a different right answer.
+   */
+  bounds: Rect;
   /** Grid the pose snaps to while dragging. Alt bypasses it. */
   snap: number;
   onPreview?: ((itemId: string, pose: Pose) => void) | undefined;
   onCommit: (itemId: string, pose: Pose) => void;
+}
+
+function clamp(value: number, lo: number, hi: number): number {
+  return hi < lo ? lo : value < lo ? lo : value > hi ? hi : value;
 }
 
 interface DragState {
@@ -47,11 +60,40 @@ export function useItemDrag({
   projector,
   items,
   placements,
+  bounds,
   snap,
   onPreview,
   onCommit,
 }: DragOptions) {
   const drag = useRef<DragState | null>(null);
+
+  /** Where the drag is pointing, snapped and kept on the canvas. */
+  const resolvePose = useCallback(
+    (state: DragState, event: React.PointerEvent, size: Size): Pose => {
+      const svg = state.node.ownerSVGElement;
+      if (svg === null) return state.startPose;
+
+      const box = svg.getBoundingClientRect();
+      const model = toModel(projector, {
+        x: event.clientX - box.left,
+        y: event.clientY - box.top,
+      });
+
+      const raw = { x: model.x - state.grabDx, y: model.y - state.grabDy };
+      /* Alt bypasses the grid, for the times when the room genuinely is not on
+         a round number. */
+      const stepped = event.altKey
+        ? { x: Math.round(raw.x), y: Math.round(raw.y) }
+        : { x: snapMm(raw.x, snap), y: snapMm(raw.y, snap) };
+
+      return {
+        ...state.startPose,
+        x: clamp(stepped.x, bounds.x, bounds.x + bounds.w - size.w),
+        y: clamp(stepped.y, bounds.y, bounds.y + bounds.d - size.d),
+      };
+    },
+    [projector, snap, bounds],
+  );
 
   /** Hand the node back to React and drop the drag, without committing. */
   const finish = useCallback(() => {
@@ -109,23 +151,10 @@ export function useItemDrag({
       const state = drag.current;
       if (state === null || event.pointerId !== state.pointerId) return;
 
-      const svg = state.node.ownerSVGElement;
-      if (svg === null) return;
+      const item = items.find((i) => i.id === state.itemId);
+      if (item === undefined) return;
 
-      const box = svg.getBoundingClientRect();
-      const model = toModel(projector, {
-        x: event.clientX - box.left,
-        y: event.clientY - box.top,
-      });
-
-      const raw = { x: model.x - state.grabDx, y: model.y - state.grabDy };
-      /* Alt bypasses the grid, for the times when the room genuinely is not on
-         a round number. */
-      const stepped = event.altKey
-        ? { x: Math.round(raw.x), y: Math.round(raw.y) }
-        : { x: snapMm(raw.x, snap), y: snapMm(raw.y, snap) };
-
-      const pose: Pose = { ...state.startPose, x: stepped.x, y: stepped.y };
+      const pose = resolvePose(state, event, rotatedSize(item.footprint, state.startPose.rot));
       state.moved = true;
 
       /* One attribute write, in model units, inside the scaled group. Nothing
@@ -136,7 +165,7 @@ export function useItemDrag({
 
       onPreview?.(state.itemId, pose);
     },
-    [projector, snap, onPreview],
+    [items, resolvePose, onPreview, projector.k],
   );
 
   const onPointerUp = useCallback(
@@ -144,24 +173,17 @@ export function useItemDrag({
       const state = drag.current;
       if (state === null || event.pointerId !== state.pointerId) return;
 
-      const svg = state.node.ownerSVGElement;
-      if (svg !== null && state.moved) {
-        const box = svg.getBoundingClientRect();
-        const model = toModel(projector, {
-          x: event.clientX - box.left,
-          y: event.clientY - box.top,
-        });
-        const raw = { x: model.x - state.grabDx, y: model.y - state.grabDy };
-        const stepped = event.altKey
-          ? { x: Math.round(raw.x), y: Math.round(raw.y) }
-          : { x: snapMm(raw.x, snap), y: snapMm(raw.y, snap) };
-
-        onCommit(state.itemId, { ...state.startPose, x: stepped.x, y: stepped.y });
+      const item = items.find((i) => i.id === state.itemId);
+      if (item !== undefined && state.moved) {
+        onCommit(
+          state.itemId,
+          resolvePose(state, event, rotatedSize(item.footprint, state.startPose.rot)),
+        );
       }
 
       finish();
     },
-    [projector, snap, onCommit, finish],
+    [items, resolvePose, onCommit, finish],
   );
 
   const onPointerCancel = useCallback(() => finish(), [finish]);
