@@ -262,6 +262,26 @@ export function boundingRectOfPoints(points: readonly Vec[]): Rect {
  * displayed, and integer squared distances compare exactly while square roots
  * introduce a float whose rounding can flip a corridor-width verdict.
  */
+/**
+ * Negate, normalising −0 back to 0.
+ *
+ * Nearly every direction in this codebase is an axis vector with a zero
+ * component, so plain negation produces `-0` constantly. It compares equal
+ * under `===` but not under `Object.is`, which means it hashes to a different
+ * slot than `0` in the optimizer's layout dedup, and it survives arithmetic but
+ * not a JSON round trip — so an exported document would not re-import
+ * byte-identically. Cheaper to have one helper than to rediscover this at each
+ * site, which has already happened three times.
+ */
+export function neg(value: number): number {
+  return value === 0 ? 0 : -value;
+}
+
+/** Negate both components of a vector, without producing −0. */
+export function negVec(v: Vec): Vec {
+  return { x: neg(v.x), y: neg(v.y) };
+}
+
 export function distSq(a: Vec, b: Vec): number {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
