@@ -31,7 +31,7 @@ Floor area only becomes a meaningful objective after three transformations:
    A 200 mm strip between the bed and the wall is floor, but nobody walks there.
 2. **Keep only what's reachable** from the doorway, using 4-connectivity. Floor sealed behind a
    wardrobe is not walkable, however open it looks on a plan.
-3. **Dilate back.** This step is the one everyone forgets. Report the *opening*, not the
+3. **Dilate back.** This step is the one everyone forgets. Report the _opening_, not the
    erosion — otherwise a 900 mm corridor gets measured as 200 mm and every corridor in the room
    is undercounted by ~78%.
 
@@ -48,9 +48,9 @@ W = (R ⊕ B_r) ∩ F               the floor a reachable body covers   ← walk
 After that, walkable area swings by 3–4 m² in a 14 m² bedroom depending purely on arrangement.
 That swing is the entire product.
 
-**Clearance zones are not obstacles.** The 700 mm you need beside the bed to get into it *is*
-walkable floor, and you walk through a doorway constantly. Zones constrain where *furniture* may
-go; they never subtract from where a *person* may walk. Conflating the two roughly halves the
+**Clearance zones are not obstacles.** The 700 mm you need beside the bed to get into it _is_
+walkable floor, and you walk through a doorway constantly. Zones constrain where _furniture_ may
+go; they never subtract from where a _person_ may walk. Conflating the two roughly halves the
 measured area and produces layouts nobody would accept.
 
 More detail — including what each soft scoring term is worth in m² of floor — will live in
@@ -87,15 +87,26 @@ sightlines and tuck-under — it is never rendered.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # vitest
-npm run typecheck
+npm run check      # typecheck + lint + format + tests — run this before committing
+npm test
 npm run build
 ```
 
-`src/core/` is a zero-dependency, DOM-free, React-free TypeScript library — the room geometry,
-the walkable-area metric, the constraint set, the optimizer and the blueprint generator all live
-there, and all of them are unit-testable without a browser. Everything under `src/render/`,
-`src/ui/` and `src/state/` is a view over it. That boundary is enforced by lint rules.
+`src/core/` is a zero-dependency, DOM-free, React-free, deterministic TypeScript library — the
+room geometry, the walkable-area metric, the constraint set, the optimizer and the blueprint
+generator all live there, and every one of them is unit-testable without a browser. Everything
+under `src/render/`, `src/ui/` and `src/state/` is a view over it.
+
+That boundary is enforced two ways, both of which have to keep passing:
+
+- `tsconfig.core.json` typechecks `src/core` with no DOM and no JSX in `lib`, so a stray
+  `document` reference fails to compile there even though it compiles fine in the app.
+- [`tests/core-boundary.test.ts`](./tests/core-boundary.test.ts) reads every core source file and
+  rejects npm imports, node builtins, host globals, `Math.random`, `Date.now` and
+  `performance.now`. It's a test rather than a lint rule because a lint rule is one
+  `disable-next-line` away from being off, and the damage from breaking this — a metric that
+  depends on wall-clock time, or a solve that can't be replayed from its seed — surfaces as flaky
+  numbers rather than as an error.
 
 ## Milestones
 

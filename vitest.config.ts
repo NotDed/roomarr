@@ -36,6 +36,16 @@ export default defineConfig({
           include: ['src/{ui,render,state,print}/**/*.test.{ts,tsx}'],
         },
       },
+      {
+        /* Repo-level invariants (the core boundary, later the fixture ratchet).
+           These read files off disk rather than importing them. */
+        extends: true,
+        test: {
+          name: 'guard',
+          environment: 'node',
+          include: ['tests/**/*.test.ts'],
+        },
+      },
     ],
     coverage: {
       provider: 'v8',
