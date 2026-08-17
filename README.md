@@ -7,7 +7,9 @@ with a tape measure while you move things.
 
 No backend, no account, no upload. Everything runs in your browser.
 
-> **Status:** early. See [milestones](#milestones) for what works today.
+> **Status:** the input side and the metric work. Measure a room, place your doors,
+> windows and furniture, and watch the walkable figure move as you drag things around.
+> The optimizer and the printable blueprint are next — see [milestones](#milestones).
 
 ---
 
@@ -110,10 +112,10 @@ That boundary is enforced two ways, both of which have to keep passing:
 
 ## Milestones
 
-- [ ] **M0** — repo, rails, app shell
-- [ ] **M1** — units, geometry, room entry as a wall run
-- [ ] **M2** — doors, windows, fixtures, furniture, your current arrangement
-- [ ] **M3** — the walkable-area metric, live while you drag, with a heat overlay
+- [x] **M0** — repo, rails, app shell
+- [x] **M1** — units, geometry, room entry as a wall run
+- [x] **M2** — doors, windows, fixtures, furniture, your current arrangement
+- [x] **M3** — the walkable-area metric, live while you drag, with a heat overlay
 - [ ] **M4** — constraints and violations in plain sentences
 - [ ] **M5** — greedy auto-arrange
 - [ ] **M6** — simulated annealing in a worker, plus a fixture bench
