@@ -1,8 +1,11 @@
 import { useMemo } from 'react';
+import { type Feature, wallsById } from '@/core/features';
 import { type Rect, inflateRect } from '@/core/geometry';
 import { type Room, roomBounds, roomWalls } from '@/core/room';
 import { type DisplayUnit, formatLength } from '@/core/units';
 import { type WallNaming, nameWalls } from '@/core/wallnames';
+import type { WallId } from '@/core/wallrun';
+import { Features } from '@/render/Features';
 import {
   type Projector,
   fitProjector,
@@ -31,6 +34,11 @@ export interface RoomPlanProps {
   /** Which wall carries the primary door, once one exists. */
   doorWallIndex?: number | undefined;
   wallLabels?: Readonly<Record<number, string>> | undefined;
+  features?: readonly Feature[] | undefined;
+  /** Wall ids in outline order, so features can find their wall. */
+  wallIds?: readonly WallId[] | undefined;
+  selectedFeatureId?: string | null | undefined;
+  onSelectFeature?: ((id: string) => void) | undefined;
   mode?: PlanMode;
 }
 
@@ -44,9 +52,14 @@ export function RoomPlan({
   unit,
   doorWallIndex,
   wallLabels,
+  features,
+  wallIds,
+  selectedFeatureId,
+  onSelectFeature,
   mode = 'screen',
 }: RoomPlanProps) {
   const walls = useMemo(() => roomWalls(room), [room]);
+  const byId = useMemo(() => wallsById(walls, wallIds ?? []), [walls, wallIds]);
   const naming = useMemo(
     () => nameWalls(walls, { doorWallIndex, labels: wallLabels }),
     [walls, doorWallIndex, wallLabels],
@@ -85,6 +98,16 @@ export function RoomPlan({
           strokeWidth={sw(projector, mode === 'print' ? 0.8 : 2.5)}
         />
       </g>
+
+      {features !== undefined && features.length > 0 && (
+        <Features
+          features={features}
+          wallsById={byId}
+          projector={projector}
+          selectedId={selectedFeatureId ?? null}
+          onSelect={onSelectFeature}
+        />
+      )}
 
       <WallDimensions room={room} projector={projector} naming={naming} unit={unit} />
       <CornerTicks room={room} projector={projector} naming={naming} />

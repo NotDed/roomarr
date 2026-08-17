@@ -1,3 +1,4 @@
+import { FeaturePanel } from '@/ui/FeaturePanel';
 import { RoomForm } from '@/ui/RoomForm';
 
 /**
@@ -13,8 +14,7 @@ export function Inspector() {
       </section>
 
       <section className="panel">
-        <h2 className="panel__title">Selection</h2>
-        <p className="panel__empty">Nothing selected.</p>
+        <FeaturePanel />
       </section>
 
       <section className="panel">

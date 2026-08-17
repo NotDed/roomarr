@@ -41,6 +41,91 @@
   fill: var(--warn);
 }
 
+/* ── Features ────────────────────────────────────────────────────────────── */
+
+.feat__item {
+  cursor: pointer;
+}
+
+.feat__item:focus-visible {
+  outline: none;
+}
+
+.feat__item--on .feat__glass,
+.feat__item--on .feat__tv,
+.feat__item--on .feat__leaf {
+  stroke: var(--focus);
+}
+
+.feat__item--on .feat__fixture {
+  stroke: var(--focus);
+}
+
+/* The opening is drawn by erasing the wall through it, which is how a floor
+   plan reads and makes a mistyped offset obvious at a glance. */
+.feat__opening {
+  stroke: var(--paper-raised);
+  stroke-linecap: butt;
+}
+
+.feat__leaf {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.feat__swingarc {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.feat__swingfill {
+  fill: var(--ink);
+  fill-opacity: 0.05;
+  stroke: none;
+}
+
+.feat__track {
+  stroke: var(--ink-faint);
+  stroke-width: 3;
+  stroke-dasharray: 2 3;
+}
+
+.feat__glass {
+  stroke: var(--focus);
+  stroke-width: 1.5;
+}
+
+.feat__reveal {
+  stroke: var(--paper-raised);
+  stroke-linecap: butt;
+}
+
+.feat__fixture {
+  fill: var(--ink-faint);
+  fill-opacity: 0.25;
+  stroke: var(--ink-faint);
+  stroke-width: 1;
+}
+
+.feat__tv {
+  stroke: var(--ink);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.feat__point {
+  fill: var(--ink-faint);
+}
+
+.feat__label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--ink-faint);
+}
+
 /* ── Dimensions ──────────────────────────────────────────────────────────── */
 
 .plan__dimline,

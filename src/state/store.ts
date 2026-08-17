@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type Room, makeRectangularRoom, validateOutline } from '@/core/room';
+import {
+  type Feature,
+  type FeatureKind,
+  FEATURE_DEFAULTS,
+  primaryDoorWallIndex,
+  wallsById,
+} from '@/core/features';
+import { type Room, type Wall, makeRectangularRoom, roomWalls, validateOutline } from '@/core/room';
 import type { DisplayUnit } from '@/core/units';
 import { SCHEMA_VERSION } from '@/core/version';
 import {
@@ -42,6 +49,18 @@ export interface RoomarrState {
   room: Room | null;
   /** User-supplied wall names, keyed by wall id. */
   wallLabels: Record<WallId, string>;
+
+  /**
+   * Doors, windows, radiators, sockets, the wall TV.
+   *
+   * A sleeping room is the default because it is the case with the extra rule
+   * (an escape window), and defaulting to the stricter reading means the
+   * warning appears for someone who never touches the setting.
+   */
+  features: Feature[];
+  roomType: 'bedroom' | 'living' | 'other';
+  selectedFeatureId: string | null;
+  nextFeatureId: number;
   /**
    * Counter behind wall ids. Persisted so ids stay unique across reloads — a
    * counter that restarted at zero would hand a fresh wall the id of one that
@@ -60,6 +79,14 @@ export interface RoomarrState {
     options: { offset: number; width: number; depth: number; direction: RecessDirection },
   ) => string | null;
   setWallLabel: (id: WallId, label: string) => void;
+
+  setRoomType: (type: RoomarrState['roomType']) => void;
+  addFeature: (kind: FeatureKind, wallId: WallId) => void;
+  updateFeature: (id: string, patch: Partial<Feature>) => void;
+  removeFeature: (id: string) => void;
+  selectFeature: (id: string | null) => void;
+  makePrimaryDoor: (id: string) => void;
+
   reset: () => void;
 }
 
@@ -93,6 +120,10 @@ export const useStore = create<RoomarrState>()(
       room: null,
       wallLabels: {},
       nextWallId: 0,
+      features: [],
+      roomType: 'bedroom',
+      selectedFeatureId: null,
+      nextFeatureId: 0,
 
       setUnit: (unit) => set({ unit }),
 
@@ -165,7 +196,83 @@ export const useStore = create<RoomarrState>()(
       setWallLabel: (id, label) =>
         set((state) => ({ wallLabels: { ...state.wallLabels, [id]: label } })),
 
-      reset: () => set({ run: null, room: null, wallLabels: {} }),
+      setRoomType: (roomType) => set({ roomType }),
+
+      addFeature: (kind, wallId) => {
+        const { nextFeatureId, features } = get();
+        const defaults = FEATURE_DEFAULTS[kind];
+        const id = `f${nextFeatureId}`;
+
+        /* The first door placed becomes the primary one. It is almost always
+           the right guess, and it means the walkable figure and the wall names
+           come alive the moment a door exists rather than after a second,
+           unexplained step. */
+        const isFirstDoor = kind === 'door' && !features.some((f) => f.kind === 'door');
+
+        const feature: Feature = {
+          id,
+          kind,
+          wallId,
+          offset: 200,
+          width: defaults.width,
+          blocksFloor: defaults.blocksFloor,
+          ...(defaults.sillHeight === undefined ? {} : { sillHeight: defaults.sillHeight }),
+          ...(defaults.headHeight === undefined ? {} : { headHeight: defaults.headHeight }),
+          ...(defaults.mountHeight === undefined ? {} : { mountHeight: defaults.mountHeight }),
+          ...(defaults.projection === undefined ? {} : { projection: defaults.projection }),
+          ...(kind === 'door'
+            ? {
+                door: {
+                  hinge: 'start' as const,
+                  swing: 'in' as const,
+                  leafWidth: defaults.width,
+                  isPrimary: isFirstDoor,
+                },
+              }
+            : {}),
+          ...(kind === 'tv-mount' ? { tv: { diagonalMm: 1400, remountable: false } } : {}),
+        };
+
+        set({
+          features: [...features, feature],
+          nextFeatureId: nextFeatureId + 1,
+          selectedFeatureId: id,
+        });
+      },
+
+      updateFeature: (id, patch) =>
+        set((state) => ({
+          features: state.features.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+        })),
+
+      removeFeature: (id) =>
+        set((state) => ({
+          features: state.features.filter((f) => f.id !== id),
+          selectedFeatureId: state.selectedFeatureId === id ? null : state.selectedFeatureId,
+        })),
+
+      selectFeature: (selectedFeatureId) => set({ selectedFeatureId }),
+
+      /* Exactly one primary door, enforced here rather than hoped for. Two
+         primaries would give the reachability flood two seeds and the blueprint
+         two conflicting vocabularies. */
+      makePrimaryDoor: (id) =>
+        set((state) => ({
+          features: state.features.map((f) =>
+            f.kind === 'door' && f.door !== undefined
+              ? { ...f, door: { ...f.door, isPrimary: f.id === id } }
+              : f,
+          ),
+        })),
+
+      reset: () =>
+        set({
+          run: null,
+          room: null,
+          wallLabels: {},
+          features: [],
+          selectedFeatureId: null,
+        }),
     }),
     {
       name: 'roomarr',
@@ -212,6 +319,9 @@ export const useStore = create<RoomarrState>()(
         room: state.room,
         wallLabels: state.wallLabels,
         nextWallId: state.nextWallId,
+        features: state.features,
+        roomType: state.roomType,
+        nextFeatureId: state.nextFeatureId,
       }),
     },
   ),
@@ -220,6 +330,35 @@ export const useStore = create<RoomarrState>()(
 /** Live closure feedback for the room form. Null when there is no run yet. */
 export function selectClosure(state: RoomarrState) {
   return state.run === null ? null : traceRun(state.run);
+}
+
+/**
+ * Everything a renderer or the metric needs to relate features to geometry.
+ *
+ * Like `wallLabelsByIndex`, deliberately a plain function rather than a zustand
+ * selector: it allocates, and zustand v5 compares snapshots by reference.
+ * Callers pass stable slices and wrap it in `useMemo`.
+ */
+export function resolveWalls(
+  room: Room | null,
+  run: WallRun | null,
+): { walls: Wall[]; byId: Map<WallId, Wall>; wallIds: WallId[] } {
+  if (room === null || run === null) return { walls: [], byId: new Map(), wallIds: [] };
+
+  const walls = roomWalls(room);
+  const wallIds = runWallIds(run);
+  return { walls, byId: wallsById(walls, wallIds), wallIds };
+}
+
+/** Which wall carries the primary door, for naming. Undefined until one exists. */
+export function selectDoorWallIndex(state: RoomarrState): number | undefined {
+  if (state.run === null) return undefined;
+  return primaryDoorWallIndex(state.features, runWallIds(state.run));
+}
+
+/** True when the room is a sleeping room, which is what turns on egress rules. */
+export function isSleepingRoom(state: RoomarrState): boolean {
+  return state.roomType === 'bedroom';
 }
 
 /**
