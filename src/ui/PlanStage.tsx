@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RoomPlan } from '@/render/RoomPlan';
 import { RunPreview } from '@/render/RunPreview';
-import { useStore } from '@/state/store';
+import { useStore, wallLabelsByIndex } from '@/state/store';
 import { EmptyState } from '@/ui/EmptyState';
 
 /**
@@ -20,7 +20,8 @@ export function PlanStage() {
   const room = useStore((s) => s.room);
   const run = useStore((s) => s.run);
   const unit = useStore((s) => s.unit);
-  const wallLabels = useStore((s) => s.wallLabels);
+  const labelsById = useStore((s) => s.wallLabels);
+  const wallLabels = useMemo(() => wallLabelsByIndex(run, labelsById), [run, labelsById]);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const hostRef = useRef<HTMLDivElement>(null);
 

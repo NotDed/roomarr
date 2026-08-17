@@ -21,6 +21,8 @@ export function RoomForm() {
   const run = useStore((s) => s.run);
   const room = useStore((s) => s.room);
   const setRun = useStore((s) => s.setRun);
+  const addWall = useStore((s) => s.addWall);
+  const removeWall = useStore((s) => s.removeWall);
   const setUnit = useStore((s) => s.setUnit);
   const applyClosure = useStore((s) => s.applyClosure);
   const startRectangle = useStore((s) => s.startRectangle);
@@ -70,9 +72,7 @@ export function RoomForm() {
               type="button"
               aria-label={`Remove wall ${index + 1}`}
               disabled={run.segments.length <= 4}
-              onClick={() => {
-                setRun({ ...run, segments: run.segments.filter((_, i) => i !== index) });
-              }}
+              onClick={() => removeWall(index)}
             >
               ×
             </button>
@@ -80,17 +80,7 @@ export function RoomForm() {
         ))}
       </ol>
 
-      <button
-        className="btn roomform__add"
-        type="button"
-        onClick={() => {
-          const last = run.segments.at(-1);
-          setRun({
-            ...run,
-            segments: [...run.segments, { length: 1000, turn: last?.turn ?? 'right' }],
-          });
-        }}
-      >
+      <button className="btn roomform__add" type="button" onClick={addWall}>
         + Add a wall
       </button>
 

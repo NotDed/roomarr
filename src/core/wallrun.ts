@@ -24,7 +24,23 @@ import type { Mm } from '@/core/units';
 /** Which way you turn at the end of a segment. */
 export type Turn = 'left' | 'right';
 
+/** A wall's stable identity, independent of its position in the run. */
+export type WallId = string;
+
 export interface RunSegment {
+  /**
+   * Stable across every edit to the run.
+   *
+   * Doors and windows attach to a wall, and a wall's *index* moves the moment
+   * an alcove is inserted before it or a wall is deleted. Without a stable id,
+   * adding an alcove near the door silently teleports the window to a
+   * different wall — a corruption that draws perfectly and is invisible until
+   * someone measures the printed plan.
+   *
+   * Ids are minted by the caller, never in here: core has no clock and no
+   * randomness, so a solve can be replayed from its seed.
+   */
+  id: WallId;
   length: Mm;
   /** The turn taken at the END of this segment, before the next one. */
   turn: Turn;
@@ -210,8 +226,24 @@ export function closeRun(run: WallRun): ClosureResult {
  */
 export type RecessDirection = 'out' | 'in';
 
+/**
+ * Where each piece of the split wall ended up, so whatever was attached to the
+ * original wall can be moved onto the right piece.
+ *
+ * Only the three pieces that run along the original wall's line appear here;
+ * the two returns are perpendicular and nothing that was on the original wall
+ * can belong to them. Note that the middle piece is the original wall span
+ * *displaced* by the recess depth — so a window inside it genuinely does end up
+ * on the face of the new bay, which is exactly what someone drawing a bay
+ * window wants.
+ */
+export interface WallSplit {
+  originalId: WallId;
+  pieces: { id: WallId; startOffset: Mm; length: Mm }[];
+}
+
 export type RecessResult =
-  | { ok: true; run: WallRun }
+  | { ok: true; run: WallRun; split: WallSplit }
   | {
       ok: false;
       reason: 'no-such-wall' | 'not-positive' | 'too-wide' | 'needs-margin';
@@ -238,6 +270,8 @@ export function insertRecess(
   run: WallRun,
   segmentIndex: number,
   options: { offset: Mm; width: Mm; depth: Mm; direction: RecessDirection },
+  /** Ids for the four walls this creates. The first piece keeps the original. */
+  newIds: readonly [WallId, WallId, WallId, WallId],
 ): RecessResult {
   const target = run.segments[segmentIndex];
   if (target === undefined) return { ok: false, reason: 'no-such-wall' };
@@ -257,13 +291,16 @@ export function insertRecess(
 
   const away: Turn = direction === 'out' ? 'left' : 'right';
   const back: Turn = direction === 'out' ? 'right' : 'left';
+  const [outId, alongId, backId, afterId] = newIds;
 
+  /* The leading piece keeps the original id: it starts where the original wall
+     started, so anything measured from that corner keeps its offset unchanged. */
   const inserted: RunSegment[] = [
-    { length: offset, turn: away },
-    { length: depth, turn: back },
-    { length: width, turn: back },
-    { length: depth, turn: away },
-    { length: after, turn: target.turn },
+    { id: target.id, length: offset, turn: away },
+    { id: outId, length: depth, turn: back },
+    { id: alongId, length: width, turn: back },
+    { id: backId, length: depth, turn: away },
+    { id: afterId, length: after, turn: target.turn },
   ];
 
   return {
@@ -274,6 +311,14 @@ export function insertRecess(
         ...run.segments.slice(0, segmentIndex),
         ...inserted,
         ...run.segments.slice(segmentIndex + 1),
+      ],
+    },
+    split: {
+      originalId: target.id,
+      pieces: [
+        { id: target.id, startOffset: 0, length: offset },
+        { id: alongId, startOffset: offset, length: width },
+        { id: afterId, startOffset: offset + width, length: after },
       ],
     },
   };
@@ -309,8 +354,15 @@ export function runToOutline(run: WallRun): RunToOutlineResult {
  * Describe an existing outline as a wall run, so a room built any other way
  * (a rectangle, an imported document, an alcove template) can be edited in the
  * same measurement-shaped form.
+ *
+ * `idFor` mints the wall id for each segment by index. Passed in rather than
+ * generated here so core stays free of counters and randomness — the caller
+ * decides whether these are fresh ids or ones being restored from a document.
  */
-export function outlineToRun(outline: readonly Vec[]): WallRun {
+export function outlineToRun(
+  outline: readonly Vec[],
+  idFor: (index: number) => WallId = (i) => `w${i}`,
+): WallRun {
   const first = outline[0];
   if (first === undefined) throw new RangeError('outlineToRun needs at least one vertex');
 
@@ -330,8 +382,22 @@ export function outlineToRun(outline: readonly Vec[]): WallRun {
 
   const segments: RunSegment[] = headings.map((heading, i) => {
     const next = headings[(i + 1) % headings.length] ?? heading;
-    return { length: lengths[i] ?? 0, turn: (next - heading + 4) % 4 === 1 ? 'right' : 'left' };
+    return {
+      id: idFor(i),
+      length: lengths[i] ?? 0,
+      turn: (next - heading + 4) % 4 === 1 ? 'right' : 'left',
+    };
   });
 
   return { start: { x: first.x, y: first.y }, heading: headings[0] ?? 0, segments };
+}
+
+/**
+ * The wall ids a run produces, in outline order.
+ *
+ * `deriveWalls` works from the outline and so knows only indices; this is the
+ * bridge that lets anything anchored to a wall id find its geometry.
+ */
+export function runWallIds(run: WallRun): WallId[] {
+  return run.segments.map((s) => s.id);
 }

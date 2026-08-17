@@ -11,18 +11,21 @@ import {
   residualMagnitude,
   runCloses,
   runToOutline,
+  runWallIds,
   traceRun,
 } from '@/core/wallrun';
+
+const IDS = ['n1', 'n2', 'n3', 'n4'] as const;
 
 /** 3.4 × 4.2 m, walked clockwise from the top-left corner heading right. */
 const RECT_RUN: WallRun = {
   start: { x: 0, y: 0 },
   heading: 0,
   segments: [
-    { length: 3400, turn: 'right' },
-    { length: 4200, turn: 'right' },
-    { length: 3400, turn: 'right' },
-    { length: 4200, turn: 'right' },
+    { id: 'a', length: 3400, turn: 'right' },
+    { id: 'b', length: 4200, turn: 'right' },
+    { id: 'c', length: 3400, turn: 'right' },
+    { id: 'd', length: 4200, turn: 'right' },
   ],
 };
 
@@ -31,12 +34,12 @@ const L_RUN: WallRun = {
   start: { x: 0, y: 0 },
   heading: 0,
   segments: [
-    { length: 3400, turn: 'right' },
-    { length: 2700, turn: 'right' },
-    { length: 800, turn: 'left' },
-    { length: 1500, turn: 'right' },
-    { length: 2600, turn: 'right' },
-    { length: 4200, turn: 'right' },
+    { id: 'a', length: 3400, turn: 'right' },
+    { id: 'b', length: 2700, turn: 'right' },
+    { id: 'c', length: 800, turn: 'left' },
+    { id: 'd', length: 1500, turn: 'right' },
+    { id: 'e', length: 2600, turn: 'right' },
+    { id: 'f', length: 4200, turn: 'right' },
   ],
 };
 
@@ -115,10 +118,10 @@ describe('closeRun', () => {
       start: { x: 0, y: 0 },
       heading: 0,
       segments: [
-        { length: 3360, turn: 'right' },
-        { length: 4200, turn: 'right' },
-        { length: 3400, turn: 'right' },
-        { length: 4200, turn: 'right' },
+        { id: 'a', length: 3360, turn: 'right' },
+        { id: 'b', length: 4200, turn: 'right' },
+        { id: 'c', length: 3400, turn: 'right' },
+        { id: 'd', length: 4200, turn: 'right' },
       ],
     };
     const result = closeRun(short);
@@ -134,10 +137,10 @@ describe('closeRun', () => {
       start: { x: 0, y: 0 },
       heading: 0,
       segments: [
-        { length: 3400, turn: 'right' },
-        { length: 4200, turn: 'right' },
-        { length: 3370, turn: 'right' },
-        { length: 4155, turn: 'right' },
+        { id: 'a', length: 3400, turn: 'right' },
+        { id: 'b', length: 4200, turn: 'right' },
+        { id: 'c', length: 3370, turn: 'right' },
+        { id: 'd', length: 4155, turn: 'right' },
       ],
     };
     const result = closeRun(off);
@@ -226,12 +229,17 @@ describe('insertRecess', () => {
      instead of extending it — and the run still closes, so nothing catches it
      but this test. */
   it('pushes a wall outward and gains exactly the alcove area', () => {
-    const result = insertRecess(RECT_RUN, 1, {
-      offset: 1500,
-      width: 1200,
-      depth: 800,
-      direction: 'out',
-    });
+    const result = insertRecess(
+      RECT_RUN,
+      1,
+      {
+        offset: 1500,
+        width: 1200,
+        depth: 800,
+        direction: 'out',
+      },
+      IDS,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -245,12 +253,17 @@ describe('insertRecess', () => {
   });
 
   it('bites into the room and loses exactly the notch area', () => {
-    const result = insertRecess(RECT_RUN, 1, {
-      offset: 1500,
-      width: 1200,
-      depth: 800,
-      direction: 'in',
-    });
+    const result = insertRecess(
+      RECT_RUN,
+      1,
+      {
+        offset: 1500,
+        width: 1200,
+        depth: 800,
+        direction: 'in',
+      },
+      IDS,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -273,12 +286,17 @@ describe('insertRecess', () => {
         fc.integer({ min: 100, max: 900 }),
         fc.constantFrom<'in' | 'out'>('in', 'out'),
         (segmentIndex, offset, width, depth, direction) => {
-          const result = insertRecess(RECT_RUN, segmentIndex, {
-            offset,
-            width,
-            depth,
-            direction,
-          });
+          const result = insertRecess(
+            RECT_RUN,
+            segmentIndex,
+            {
+              offset,
+              width,
+              depth,
+              direction,
+            },
+            IDS,
+          );
           if (result.ok) expect(runCloses(traceRun(result.run))).toBe(true);
         },
       ),
@@ -286,22 +304,32 @@ describe('insertRecess', () => {
   });
 
   it('stacks, so a stepped bay is the same template applied twice', () => {
-    const first = insertRecess(RECT_RUN, 1, {
-      offset: 1200,
-      width: 1800,
-      depth: 300,
-      direction: 'out',
-    });
+    const first = insertRecess(
+      RECT_RUN,
+      1,
+      {
+        offset: 1200,
+        width: 1800,
+        depth: 300,
+        direction: 'out',
+      },
+      IDS,
+    );
     expect(first.ok).toBe(true);
     if (!first.ok) return;
 
     /* Segment 3 is the outer face of the first step. */
-    const second = insertRecess(first.run, 3, {
-      offset: 400,
-      width: 1000,
-      depth: 300,
-      direction: 'out',
-    });
+    const second = insertRecess(
+      first.run,
+      3,
+      {
+        offset: 400,
+        width: 1000,
+        depth: 300,
+        direction: 'out',
+      },
+      IDS,
+    );
     expect(second.ok).toBe(true);
     if (!second.ok) return;
 
@@ -313,12 +341,17 @@ describe('insertRecess', () => {
   });
 
   it('refuses a recess wider than the wall, and says how much wall there is', () => {
-    const result = insertRecess(RECT_RUN, 0, {
-      offset: 3000,
-      width: 1000,
-      depth: 400,
-      direction: 'out',
-    });
+    const result = insertRecess(
+      RECT_RUN,
+      0,
+      {
+        offset: 3000,
+        width: 1000,
+        depth: 400,
+        direction: 'out',
+      },
+      IDS,
+    );
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.reason).toBe('too-wide');
@@ -330,12 +363,17 @@ describe('insertRecess', () => {
      millimetre behind the user's back. */
   it('refuses a recess flush against either corner', () => {
     for (const offset of [0, 2400]) {
-      const result = insertRecess(RECT_RUN, 0, {
-        offset,
-        width: 1000,
-        depth: 400,
-        direction: 'out',
-      });
+      const result = insertRecess(
+        RECT_RUN,
+        0,
+        {
+          offset,
+          width: 1000,
+          depth: 400,
+          direction: 'out',
+        },
+        IDS,
+      );
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(result.reason).toBe('needs-margin');
@@ -348,7 +386,7 @@ describe('insertRecess', () => {
       { offset: 100, width: 500, depth: 0 },
       { offset: -50, width: 500, depth: 400 },
     ]) {
-      const result = insertRecess(RECT_RUN, 0, { ...bad, direction: 'out' });
+      const result = insertRecess(RECT_RUN, 0, { ...bad, direction: 'out' }, IDS);
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(result.reason).toBe('not-positive');
@@ -356,20 +394,93 @@ describe('insertRecess', () => {
   });
 
   it('refuses an unknown wall', () => {
-    const result = insertRecess(RECT_RUN, 99, {
-      offset: 100,
-      width: 500,
-      depth: 400,
-      direction: 'out',
-    });
+    const result = insertRecess(
+      RECT_RUN,
+      99,
+      {
+        offset: 100,
+        width: 500,
+        depth: 400,
+        direction: 'out',
+      },
+      IDS,
+    );
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.reason).toBe('no-such-wall');
   });
 
+  /* The reason walls carry ids at all. Without this, inserting an alcove near
+     the door renumbers every wall after it, and a window quietly relocates to a
+     different wall — a corruption that draws perfectly and is invisible until
+     someone measures the printed plan. */
+  it('leaves the ids of untouched walls alone', () => {
+    const result = insertRecess(
+      RECT_RUN,
+      1,
+      { offset: 1500, width: 1200, depth: 800, direction: 'out' },
+      IDS,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const ids = result.run.segments.map((s) => s.id);
+    /* Wall 'a' came before the split and 'c'/'d' after; all keep their identity
+       even though their indices moved from 0,2,3 to 0,6,7. */
+    expect(ids[0]).toBe('a');
+    expect(ids.at(-2)).toBe('c');
+    expect(ids.at(-1)).toBe('d');
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('keeps the original id on the piece that starts at the same corner', () => {
+    const result = insertRecess(
+      RECT_RUN,
+      1,
+      { offset: 1500, width: 1200, depth: 800, direction: 'out' },
+      IDS,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.split.originalId).toBe('b');
+    expect(result.split.pieces[0]).toEqual({ id: 'b', startOffset: 0, length: 1500 });
+  });
+
+  /* The split map is what lets anything attached to the wall be moved onto the
+     right piece. The three pieces have to tile the original wall exactly, or a
+     window at some offset would land on no piece at all. */
+  it('reports pieces that tile the original wall exactly', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 100, max: 1500 }),
+        fc.integer({ min: 100, max: 1200 }),
+        (offset, width) => {
+          const result = insertRecess(
+            RECT_RUN,
+            1,
+            { offset, width, depth: 400, direction: 'out' },
+            IDS,
+          );
+          if (!result.ok) return;
+
+          const pieces = result.split.pieces;
+          expect(pieces[0]?.startOffset).toBe(0);
+          for (let i = 1; i < pieces.length; i++) {
+            const prev = pieces[i - 1];
+            const cur = pieces[i];
+            if (prev === undefined || cur === undefined) continue;
+            expect(cur.startOffset).toBe(prev.startOffset + prev.length);
+          }
+          const last = pieces.at(-1);
+          expect((last?.startOffset ?? 0) + (last?.length ?? 0)).toBe(4200);
+        },
+      ),
+    );
+  });
+
   it('does not mutate the run it was given', () => {
     const before = JSON.stringify(RECT_RUN);
-    insertRecess(RECT_RUN, 1, { offset: 1500, width: 1200, depth: 800, direction: 'out' });
+    insertRecess(RECT_RUN, 1, { offset: 1500, width: 1200, depth: 800, direction: 'out' }, IDS);
     expect(JSON.stringify(RECT_RUN)).toBe(before);
   });
 });
@@ -410,12 +521,12 @@ describe('runToOutline', () => {
       start: { x: 0, y: 0 },
       heading: 0,
       segments: [
-        { length: 2000, turn: 'right' },
-        { length: 2000, turn: 'right' },
-        { length: 1000, turn: 'right' },
-        { length: 3000, turn: 'left' },
-        { length: 1000, turn: 'left' },
-        { length: 1000, turn: 'right' },
+        { id: 'x2000', length: 2000, turn: 'right' },
+        { id: 'x2000', length: 2000, turn: 'right' },
+        { id: 'x1000', length: 1000, turn: 'right' },
+        { id: 'x3000', length: 3000, turn: 'left' },
+        { id: 'x1000', length: 1000, turn: 'left' },
+        { id: 'x1000', length: 1000, turn: 'right' },
       ],
     };
     const result = runToOutline(figureEight);
@@ -424,7 +535,26 @@ describe('runToOutline', () => {
   });
 });
 
+describe('runWallIds', () => {
+  it('lists wall ids in outline order', () => {
+    expect(runWallIds(RECT_RUN)).toEqual(['a', 'b', 'c', 'd']);
+  });
+});
+
 describe('outlineToRun', () => {
+  it('mints ids through the callback rather than inventing them', () => {
+    const run = outlineToRun(
+      [
+        { x: 0, y: 0 },
+        { x: 3400, y: 0 },
+        { x: 3400, y: 4200 },
+        { x: 0, y: 4200 },
+      ],
+      (i) => `wall-${i}`,
+    );
+    expect(runWallIds(run)).toEqual(['wall-0', 'wall-1', 'wall-2', 'wall-3']);
+  });
+
   it('round-trips a rectangle', () => {
     const outline: Vec[] = [
       { x: 0, y: 0 },
