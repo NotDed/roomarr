@@ -39,12 +39,23 @@ function importsOf(source: string): string[] {
   return found;
 }
 
-/** Globals that make core non-portable or non-deterministic. */
+/**
+ * Globals that make core non-portable or non-deterministic.
+ *
+ * Each host global is matched as an actual *reference*: not preceded by a dot
+ * (which would make it someone else's property) and not followed by a colon
+ * (which would make it an object key or a type annotation). Without those two
+ * guards, a feature whose `kind` is `'window'` and whose defaults table has a
+ * `window:` entry trips a DOM check — and a guard that cries wolf is a guard
+ * someone eventually deletes.
+ */
+const ref = (name: string) => new RegExp(String.raw`(?<![.\w$])${name}\b(?!\s*:)`);
+
 const FORBIDDEN_GLOBALS: ReadonlyArray<readonly [pattern: RegExp, why: string]> = [
-  [/\bdocument\b/, 'core must not touch the DOM — it has to run in a worker and in node'],
-  [/\bwindow\b/, 'core must not touch the DOM — it has to run in a worker and in node'],
-  [/\blocalStorage\b/, 'persistence belongs in src/state, not in core'],
-  [/\bnavigator\b/, 'core must not branch on the host environment'],
+  [ref('document'), 'core must not touch the DOM — it has to run in a worker and in node'],
+  [ref('window'), 'core must not touch the DOM — it has to run in a worker and in node'],
+  [ref('localStorage'), 'persistence belongs in src/state, not in core'],
+  [ref('navigator'), 'core must not branch on the host environment'],
   [/\bfetch\s*\(/, 'core is offline and synchronous by design'],
   [
     /\bMath\s*\.\s*random\s*\(/,
@@ -85,11 +96,7 @@ describe('src/core boundary', () => {
   it.each(files.map((f) => [relative(ROOT, f), f] as const))(
     '%s uses no host globals and no ambient nondeterminism',
     (rel, full) => {
-      /* Strip comments so prose explaining *why* Math.random is banned does not
-         itself trip the check. */
-      const code = readFileSync(full, 'utf8')
-        .replaceAll(/\/\*[\s\S]*?\*\//g, '')
-        .replaceAll(/\/\/[^\n]*/g, '');
+      const code = stripCommentsAndStrings(readFileSync(full, 'utf8'));
 
       for (const [pattern, why] of FORBIDDEN_GLOBALS) {
         expect(pattern.test(code), `${rel}: ${why}`).toBe(false);
@@ -97,3 +104,22 @@ describe('src/core boundary', () => {
     },
   );
 });
+
+/**
+ * Remove comments and string literals before looking for global references.
+ *
+ * Both exclusions are load-bearing rather than tidying. Comments explaining
+ * *why* `Math.random` is banned would otherwise trip the check that bans it.
+ * And a reference to a global can never live inside a string, so scanning
+ * string contents only produces false positives — `kind: 'window'` on a feature
+ * is not the DOM's `window`, and a guard that cries wolf about it gets switched
+ * off, which costs far more than the imprecision it was protecting against.
+ */
+function stripCommentsAndStrings(source: string): string {
+  return source
+    .replaceAll(/\/\*[\s\S]*?\*\//g, ' ')
+    .replaceAll(/\/\/[^\n]*/g, ' ')
+    .replaceAll(/'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replaceAll(/"(?:[^"\\\n]|\\.)*"/g, '""')
+    .replaceAll(/`(?:[^`\\]|\\.)*`/g, '``');
+}
