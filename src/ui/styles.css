@@ -1291,3 +1291,135 @@ kbd {
   border: 1px solid var(--rule);
   border-radius: 4px;
 }
+
+/* ── Arrangements ────────────────────────────────────────────────────────── */
+
+.layouts {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  margin: 10px 0;
+  list-style: none;
+}
+
+.layout {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  min-width: 0;
+  border-radius: var(--radius);
+}
+
+.layout:hover {
+  background: var(--paper-sunken);
+}
+
+.layout--on {
+  background: color-mix(in srgb, var(--focus) 12%, transparent);
+}
+
+.layout__pick {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 7px 8px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.layout__name {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout--on .layout__name {
+  font-weight: 600;
+}
+
+.layout__stats {
+  display: flex;
+  flex-shrink: 0;
+  gap: 7px;
+  align-items: baseline;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+/* The delta is the number people actually read, so it gets the weight and the
+   colour. The absolute figure beside it is there to be checked, not scanned. */
+.layout__delta {
+  font-family: var(--font-mono);
+  font-weight: 650;
+  color: var(--ink-faint);
+}
+
+.layout__delta--up {
+  color: var(--walkable);
+}
+
+.layout__delta--down {
+  color: var(--warn);
+}
+
+.layout__problems {
+  color: var(--danger);
+}
+
+.layout__rename {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--focus);
+  border-radius: var(--radius);
+}
+
+/* Hidden until the row is hovered or holds focus, so a list of five
+   arrangements reads as five names rather than as fifteen buttons. Focus-within
+   keeps them reachable by keyboard, where "hover" does not exist. */
+/* Never shrinks: the name truncates instead. An action button squeezed to
+   nothing is a control you cannot hit, whereas half a name is still a name. */
+.layout__acts {
+  display: flex;
+  flex-shrink: 0;
+  gap: 1px;
+  padding-right: 4px;
+  opacity: 0;
+}
+
+.layout:hover .layout__acts,
+.layout:focus-within .layout__acts {
+  opacity: 1;
+}
+
+.iconbtn {
+  padding: 3px 6px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--ink-faint);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.iconbtn:hover {
+  color: var(--ink);
+  background: var(--paper-raised);
+}
+
+.iconbtn--danger:hover {
+  color: var(--danger);
+}

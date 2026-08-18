@@ -129,6 +129,7 @@ export interface RoomarrState {
   /** "As it is now" — what every later suggestion is measured against. */
   baselineLayoutId: string;
   activeLayoutId: string;
+  nextLayoutId: number;
   selectedItemId: string | null;
   nextItemId: number;
 
@@ -239,7 +240,34 @@ export interface RoomarrState {
   keepSuggestion: () => void;
   discardSuggestion: () => void;
 
+  switchLayout: (id: string) => void;
+  saveLayoutAs: (name?: string) => void;
+  duplicateLayout: (id: string) => void;
+  renameLayout: (id: string, name: string) => void;
+  deleteLayout: (id: string) => void;
+
   reset: () => void;
+}
+
+/**
+ * A name no other arrangement is using.
+ *
+ * Names collide constantly here, because the good ones are generated: run the
+ * search twice and both winners are called "Most open floor". Two identical
+ * rows in a list you pick from is the kind of small ambiguity that makes people
+ * stop trusting a feature, so the second one becomes "Most open floor 2".
+ *
+ * `except` is the row being renamed, which must not collide with itself —
+ * otherwise re-saving a name unchanged would append a number every time.
+ */
+function uniqueLayoutName(base: string, layouts: readonly Layout[], except?: string): string {
+  const taken = new Set(layouts.filter((l) => l.id !== except).map((l) => l.name));
+  if (!taken.has(base)) return base;
+
+  for (let n = 2; ; n++) {
+    const candidate = `${base} ${n}`;
+    if (!taken.has(candidate)) return candidate;
+  }
 }
 
 const RECESS_PROBLEMS: Record<string, string> = {
@@ -319,6 +347,7 @@ export const useStore = create<RoomarrState>()(
       layouts: [{ id: 'now', name: 'As it is now', kind: 'baseline', placements: [] }],
       baselineLayoutId: 'now',
       activeLayoutId: 'now',
+      nextLayoutId: 0,
       selectedItemId: null,
       nextItemId: 0,
       bodyRadius: 'comfort',
@@ -653,20 +682,149 @@ export const useStore = create<RoomarrState>()(
 
       setMaxMoves: (maxMoves) => set({ maxMoves }),
 
+      /**
+       * Keep a suggested arrangement.
+       *
+       * It becomes a **new** arrangement when the baseline is active, rather
+       * than overwriting it. "As it is now" is the record of the room you
+       * actually have, and it is what every figure in the app is a difference
+       * from — silently replacing it with a proposal would destroy the
+       * comparison and there would be nothing to undo it with. Once you are
+       * working inside a saved arrangement, Keep edits that one in place,
+       * because by then you have already said which one you are working on.
+       *
+       * The new one is named after the option's own label, so the list reads
+       * as reasons rather than as "Arrangement 3".
+       */
       keepSuggestion: () => {
-        const { suggestion, activeLayoutId } = get();
+        const { suggestion, activeLayoutId, baselineLayoutId } = get();
         const option = suggestion?.options[suggestion.chosen];
         if (option === undefined) return;
 
-        set((state) => ({
-          layouts: state.layouts.map((l) =>
-            l.id === activeLayoutId ? { ...l, placements: option.layout.placements } : l,
-          ),
-          suggestion: null,
-        }));
+        if (activeLayoutId !== baselineLayoutId) {
+          set((state) => ({
+            layouts: state.layouts.map((l) =>
+              l.id === activeLayoutId ? { ...l, placements: option.layout.placements } : l,
+            ),
+            suggestion: null,
+          }));
+          return;
+        }
+
+        set((state) => {
+          const id = `layout-${state.nextLayoutId}`;
+          const layout: Layout = {
+            id,
+            name: uniqueLayoutName(option.label, state.layouts),
+            kind: 'saved',
+            placements: option.layout.placements.map((p) => ({ ...p })),
+          };
+
+          return {
+            layouts: [...state.layouts, layout],
+            nextLayoutId: state.nextLayoutId + 1,
+            activeLayoutId: id,
+            suggestion: null,
+          };
+        });
       },
 
       discardSuggestion: () => set({ suggestion: null }),
+
+      /**
+       * Switch which arrangement is being edited.
+       *
+       * The suggestion and the drag preview both go, because both were computed
+       * against the layout you just left. Carrying a suggestion across would
+       * show deltas measured from a room that is no longer on screen.
+       */
+      switchLayout: (id) =>
+        set((state) =>
+          state.layouts.some((l) => l.id === id)
+            ? { activeLayoutId: id, suggestion: null, preview: null }
+            : state,
+        ),
+
+      saveLayoutAs: (name) =>
+        set((state) => {
+          const active =
+            state.layouts.find((l) => l.id === state.activeLayoutId) ?? state.layouts[0];
+          if (active === undefined) return state;
+
+          const id = `layout-${state.nextLayoutId}`;
+          const layout: Layout = {
+            id,
+            name: uniqueLayoutName(name ?? `${active.name} copy`, state.layouts),
+            kind: 'saved',
+            placements: active.placements.map((p) => ({ ...p })),
+          };
+
+          return {
+            layouts: [...state.layouts, layout],
+            nextLayoutId: state.nextLayoutId + 1,
+            activeLayoutId: id,
+            suggestion: null,
+          };
+        }),
+
+      duplicateLayout: (id) =>
+        set((state) => {
+          const source = state.layouts.find((l) => l.id === id);
+          if (source === undefined) return state;
+
+          const newId = `layout-${state.nextLayoutId}`;
+          return {
+            layouts: [
+              ...state.layouts,
+              {
+                id: newId,
+                name: uniqueLayoutName(`${source.name} copy`, state.layouts),
+                kind: 'saved',
+                placements: source.placements.map((p) => ({ ...p })),
+              },
+            ],
+            nextLayoutId: state.nextLayoutId + 1,
+            activeLayoutId: newId,
+            suggestion: null,
+          };
+        }),
+
+      renameLayout: (id, name) =>
+        set((state) => {
+          const trimmed = name.trim();
+          /* An empty name would make the row unclickable and unrecoverable.
+             Keeping the old one is the only non-destructive reading. */
+          if (trimmed === '') return state;
+
+          return {
+            layouts: state.layouts.map((l) =>
+              l.id === id ? { ...l, name: uniqueLayoutName(trimmed, state.layouts, id) } : l,
+            ),
+          };
+        }),
+
+      /**
+       * Delete an arrangement. The baseline is not deletable.
+       *
+       * Every improvement in the app is stated as a difference from "as it is
+       * now". Without it there is no zero to measure from, and the honest
+       * answer to "is this better?" becomes unavailable — so the control is
+       * simply absent on that row rather than present and complaining.
+       */
+      deleteLayout: (id) =>
+        set((state) => {
+          if (id === state.baselineLayoutId) return state;
+          const layouts = state.layouts.filter((l) => l.id !== id);
+          if (layouts.length === state.layouts.length) return state;
+
+          return {
+            layouts,
+            activeLayoutId:
+              state.activeLayoutId === id ? state.baselineLayoutId : state.activeLayoutId,
+            suggestion: null,
+            preview: null,
+          };
+        }),
 
       dismissProblem: (key) =>
         set((state) =>
@@ -739,6 +897,7 @@ export const useStore = create<RoomarrState>()(
         layouts: state.layouts,
         baselineLayoutId: state.baselineLayoutId,
         activeLayoutId: state.activeLayoutId,
+        nextLayoutId: state.nextLayoutId,
         nextItemId: state.nextItemId,
         bodyRadius: state.bodyRadius,
         showHeat: state.showHeat,

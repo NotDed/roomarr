@@ -1,6 +1,7 @@
 import { ArrangePanel } from '@/ui/ArrangePanel';
 import { FeaturePanel } from '@/ui/FeaturePanel';
 import { ItemPanel } from '@/ui/ItemPanel';
+import { LayoutPanel } from '@/ui/LayoutPanel';
 import { MetricPanel } from '@/ui/MetricPanel';
 import { ProblemsPanel } from '@/ui/ProblemsPanel';
 import { RoomForm } from '@/ui/RoomForm';
@@ -23,6 +24,10 @@ export function Inspector() {
 
       <section className="panel panel--arrange">
         <ArrangePanel />
+      </section>
+
+      <section className="panel">
+        <LayoutPanel />
       </section>
 
       <section className="panel">
