@@ -10,8 +10,9 @@ No backend, no account, no upload. Everything runs in your browser.
 > **Status:** usable end to end. Measure a room, place your doors, windows and furniture,
 > see what's wrong with it in plain sentences, and press one button to get a better
 > arrangement — which it will decline to give you if what you have is already the best it
-> found. Still to come: magnetic snapping, saved arrangements, a side-by-side compare, and
-> the printable blueprint. See [milestones](#milestones).
+> found. Keep several arrangements, drag furniture with magnetic snapping to walls, edges,
+> centre lines, clearances and equal gaps, and compare any two side by side with the move
+> list between them. Still to come: the printable blueprint. See [milestones](#milestones).
 
 ---
 
@@ -96,6 +97,12 @@ state, so the disconnection stops mattering. Same budget, and on the bedroom fix
   sane viewing band. Layouts that break these are rejected, not merely penalized.
 - **A move budget, not a mystery.** "Move at most 3 things" is a slider, so the tool can propose
   a small tweak instead of an unusable full teardown.
+- **Snapping that finds the relationships, not a grid.** Flush to a wall, aligned with the
+  wardrobe, centred under the window, clear of the bed's access strip — each kind
+  independently toggleable, each drawing a guide that names what it found. Snaps resolve per
+  axis, so sliding along a wall cannot knock you off it.
+- **Several arrangements, compared side by side.** Keeping a suggestion never overwrites
+  "as it is now" — that is the zero everything else is measured from.
 - **A blueprint that survives contact with a tape measure.** Every position is printed as two
   gaps from a named corner, plus a cross-check and a squareness pair, plus an ordered move list
   that can't deadlock when two items need to swap places.
@@ -144,7 +151,7 @@ That boundary is enforced two ways, both of which have to keep passing:
 - [x] **M5** — greedy auto-arrange
 - [x] **M6** — the search in a worker, plus a fixture bench
 - [x] **M7** — three labelled options and a move budget
-- [ ] **M7b** — magnetic snapping, saved arrangements, the compare screen
+- [x] **M7b** — magnetic snapping, saved arrangements, the compare screen
 - [ ] **M8** — the printable blueprint and the move plan
 - [ ] **M9** — import/export, sample rooms, onboarding
 
