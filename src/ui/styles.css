@@ -1423,3 +1423,200 @@ kbd {
 .iconbtn--danger:hover {
   color: var(--danger);
 }
+
+/* ── Compare ─────────────────────────────────────────────────────────────── */
+
+.viewswitch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--paper-sunken);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.viewswitch__opt {
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.viewswitch__opt--on {
+  color: var(--ink);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.compare {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: var(--paper);
+}
+
+/* auto-fill rather than a computed column count: the thumbnails are a fixed
+   size, so the only question is how many fit, and the browser answers it
+   better than arithmetic over a ResizeObserver. */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(286px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  align-content: start;
+}
+
+.card {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 10px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--focus);
+}
+
+.card--active {
+  border-color: var(--focus);
+  box-shadow: inset 0 0 0 1px var(--focus);
+}
+
+.card__name {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.card__tag {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--focus);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: color-mix(in srgb, var(--focus) 14%, transparent);
+  border-radius: 3px;
+}
+
+.card__stats,
+.twoup__caption .card__stats {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.card__delta {
+  font-family: var(--font-mono);
+  font-weight: 650;
+}
+
+.card__delta--up {
+  color: var(--walkable);
+}
+
+.card__delta--down {
+  color: var(--warn);
+}
+
+.card__problems {
+  color: var(--danger);
+}
+
+.card__ok {
+  color: var(--walkable);
+}
+
+.twoup {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+}
+
+.twoup__head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.twoup__plans {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.twoup__side {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.twoup__caption {
+  display: grid;
+  gap: 3px;
+}
+
+.twoup__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Sits in the gutter between the two plans, so the pair reads as "this becomes
+   that" rather than as two unrelated drawings that happen to be adjacent. */
+.twoup__arrow {
+  position: absolute;
+  top: 40%;
+  right: -22px;
+  font-size: 18px;
+  color: var(--ink-faint);
+}
+
+.twoup__verdict {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.moves {
+  display: grid;
+  gap: 3px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.move {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 9px;
+  font-size: 12.5px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.move__name {
+  font-weight: 600;
+}
+
+.move__what {
+  color: var(--ink-muted);
+}

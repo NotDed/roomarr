@@ -33,7 +33,15 @@ import {
  * approved on screen is worse than no blueprint at all.
  */
 
-export type PlanMode = 'screen' | 'print';
+/**
+ * `thumb` is for the comparison gallery: the same geometry, none of the
+ * annotation. At 300 px wide the dimension chains, corner ticks and scale bar
+ * are illegible *and* they consume most of the space, so the plan they surround
+ * ends up smaller than the labels explaining it. What a thumbnail is for is
+ * "which of these is the one with the bed on the far wall", and that needs the
+ * outline and the furniture and nothing else.
+ */
+export type PlanMode = 'screen' | 'print' | 'thumb';
 
 export interface RoomPlanProps {
   room: Room;
@@ -71,6 +79,8 @@ export interface RoomPlanProps {
 
 /** Paper units of clear space around the room for dimensions and labels. */
 const MARGIN = 56;
+/** Thumbnails carry no annotation, so they need only enough to breathe. */
+const THUMB_MARGIN = 8;
 
 export function RoomPlan({
   room,
@@ -105,8 +115,8 @@ export function RoomPlan({
 
   const bounds = useMemo(() => roomBounds(room), [room]);
   const projector = useMemo(
-    () => fitProjector(bounds, { width, height }, MARGIN),
-    [bounds, width, height],
+    () => fitProjector(bounds, { width, height }, mode === 'thumb' ? THUMB_MARGIN : MARGIN),
+    [bounds, width, height, mode],
   );
 
   const path = useMemo(
@@ -202,9 +212,13 @@ export function RoomPlan({
             explaining explains nothing. */}
         {onItemMove !== undefined && <SnapGuides projector={projector} handle={guides} />}
 
-        <WallDimensions room={room} projector={projector} naming={naming} unit={unit} />
-        <CornerTicks room={room} projector={projector} naming={naming} />
-        <ScaleBar projector={projector} unit={unit} height={height} />
+        {mode !== 'thumb' && (
+          <>
+            <WallDimensions room={room} projector={projector} naming={naming} unit={unit} />
+            <CornerTicks room={room} projector={projector} naming={naming} />
+            <ScaleBar projector={projector} unit={unit} height={height} />
+          </>
+        )}
       </svg>
     </div>
   );

@@ -144,6 +144,13 @@ export interface RoomarrState {
   showHeat: boolean;
 
   /**
+   * Which screen is up. Deliberately not persisted: reloading should land you
+   * on the plan, because that is where work happens and compare is somewhere
+   * you visit to make one decision and leave.
+   */
+  view: 'plan' | 'compare';
+
+  /**
    * Which magnetic snaps are live while dragging.
    *
    * Four independent flags rather than one on/off, because they suit different
@@ -228,6 +235,7 @@ export interface RoomarrState {
 
   setBodyRadius: (name: BodyRadiusName) => void;
   toggleHeat: () => void;
+  setView: (view: RoomarrState['view']) => void;
   toggleSnap: (kind: keyof SnapToggles) => void;
   setAllSnaps: (on: boolean) => void;
   setPreview: (preview: { itemId: string; pose: Pose } | null) => void;
@@ -352,6 +360,7 @@ export const useStore = create<RoomarrState>()(
       nextItemId: 0,
       bodyRadius: 'comfort',
       showHeat: true,
+      view: 'plan',
       snapTo: ALL_SNAPS,
       preview: null,
       dismissedProblems: [],
@@ -593,6 +602,7 @@ export const useStore = create<RoomarrState>()(
 
       setBodyRadius: (bodyRadius) => set({ bodyRadius }),
       toggleHeat: () => set((state) => ({ showHeat: !state.showHeat })),
+      setView: (view) => set({ view }),
 
       toggleSnap: (kind) =>
         set((state) => ({ snapTo: { ...state.snapTo, [kind]: !state.snapTo[kind] } })),

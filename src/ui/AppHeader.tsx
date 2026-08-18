@@ -19,6 +19,9 @@ export function AppHeader() {
   const preview = useStore((s) => s.preview);
   const showHeat = useStore((s) => s.showHeat);
   const toggleHeat = useStore((s) => s.toggleHeat);
+  const view = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
+  const layoutCount = useStore((s) => s.layouts.length);
 
   const live = useMemo(() => layoutWithPreview(layout, preview), [layout, preview]);
   const result = useMemo(
@@ -38,7 +41,25 @@ export function AppHeader() {
 
       <div className="header__spacer" />
 
-      {result !== null && (
+      {/* Appears only once there is a second arrangement. With one, comparing
+          is a screen that shows you your room next to nothing. */}
+      {layoutCount > 1 && (
+        <div className="viewswitch" role="group" aria-label="View">
+          {(['plan', 'compare'] as const).map((which) => (
+            <button
+              key={which}
+              type="button"
+              className={which === view ? 'viewswitch__opt viewswitch__opt--on' : 'viewswitch__opt'}
+              aria-pressed={which === view}
+              onClick={() => setView(which)}
+            >
+              {which === 'plan' ? 'Plan' : 'Compare'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {result !== null && view === 'plan' && (
         <button
           className="btn btn--quiet"
           type="button"
